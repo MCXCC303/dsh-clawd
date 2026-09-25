@@ -1,18 +1,27 @@
 #!/usr/bin/env node
 /**
- * Materializes the local-only `clawd` theme.
+ * Materializes every bundled theme of a `clawd-on-desk` installation into
+ * `assets/local-themes/`, a directory `.gitignore` excludes.
  *
- * The Clawd artwork belongs to a separate project whose asset license forbids
- * redistribution (`All Rights Reserved`; the character itself is Anthropic's).
- * This repository therefore never carries it: this script links the artwork
- * from an installed `clawd-on-desk` checkout into `assets/local-themes/clawd/`,
- * a directory that `.gitignore` excludes. Everything else in the plugin works
- * without it — the committed `placeholder` theme is what a clone renders.
+ * Why this exists: that project's artwork is `All Rights Reserved` — explicitly
+ * outside its source license, and the Clawd character itself is Anthropic's
+ * (see PROVENANCE.md). None of it may be redistributed, so this repository ships
+ * only its own MIT placeholder theme and pulls the rest in locally, on demand,
+ * from an installation the user already has.
+ *
+ * The themes are not copied file-for-file as they are upstream: each upstream
+ * `theme.json` is *translated* into this plugin's manifest schema (states,
+ * tiers, idle pool, reactions, timings, content box), and only fields this
+ * plugin understands are carried over. The result lives in a git-ignored
+ * directory, so no upstream file — manifest or artwork — enters this repository.
  *
  * Usage:
- *   node scripts/setup-local-art.mjs [--from /path/to/clawd-on-desk] [--force]
+ *   node scripts/setup-local-art.mjs [--from /path/to/clawd-on-desk]
+ *                                    [--only clawd,calico] [--link] [--force]
  *
- * See PROVENANCE.md, section 2, for the licensing this script exists to respect.
+ *   --link   symlink the artwork instead of copying it (saves ~12 MiB, but the
+ *            themes then break if the source checkout moves).
+ *   --force  replace themes that were materialized before.
  */
 
 import fs from 'node:fs'
@@ -20,49 +29,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const TARGET = path.join(ROOT, 'assets', 'local-themes', 'clawd')
+import { ALL_STATES } from '../lib/state.js'
+import { validateTheme } from '../lib/theme.js'
 
-/** state -> artwork file in the source checkout's `assets/svg/`, plus reactions and idle pool. */
-const MAPPING = {
-  states: {
-    idle: ['clawd-idle-follow.svg'],
-    thinking: ['clawd-working-thinking.svg'],
-    working: ['clawd-working-typing.svg'],
-    attention: ['clawd-happy.svg'],
-    error: ['clawd-error.svg'],
-    notification: ['clawd-notification.svg'],
-    sweeping: ['clawd-working-sweeping.svg'],
-    juggling: ['clawd-headphones-groove.svg'],
-    carrying: ['clawd-working-carrying.svg'],
-    sleeping: ['clawd-sleeping.svg'],
-    yawning: ['clawd-idle-yawn.svg'],
-    dozing: ['clawd-idle-doze.svg'],
-    collapsing: ['clawd-collapse-sleep.svg'],
-    waking: ['clawd-wake.svg'],
-    roam: ['clawd-mini-crabwalk.svg'],
-  },
-  idleAnimations: [
-    { file: 'clawd-idle-look.svg', duration: 6500 },
-    { file: 'clawd-idle-bubble.svg', duration: 13500 },
-    { file: 'clawd-idle-reading.svg', duration: 14000 },
-  ],
-  workingTiers: [
-    { minSessions: 3, file: 'clawd-working-building.svg' },
-    { minSessions: 2, file: 'clawd-headphones-groove.svg' },
-    { minSessions: 1, file: 'clawd-working-typing.svg' },
-  ],
-  reactions: {
-    drag: { file: 'clawd-react-drag.svg' },
-    clickLeft: { file: 'clawd-react-left.svg', duration: 2500 },
-    clickRight: { file: 'clawd-react-right.svg', duration: 2500 },
-    double: { files: ['clawd-react-double.svg', 'clawd-react-double-jump.svg'], duration: 2500 },
-    annoyed: { file: 'clawd-react-annoyed.svg', duration: 3500 },
-  },
-  timings: {
-    minDisplay: { attention: 4000, error: 5000, sweeping: 5500, notification: 5000, carrying: 3000 },
-  },
-}
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const TARGET_ROOT = path.join(ROOT, 'assets', 'local-themes')
 
 const argv = process.argv.slice(2)
 const flag = (name) => argv.includes(`--${name}`)
@@ -70,6 +41,12 @@ const value = (name) => {
   const index = argv.indexOf(`--${name}`)
   return index >= 0 ? argv[index + 1] : undefined
 }
+
+const NOTICE = 'All Rights Reserved — LOCAL USE ONLY, NOT REDISTRIBUTABLE'
+const LICENSE_NOTE =
+  'The artwork in this theme is neither this repository’s nor covered by its MIT license. It was materialized locally by scripts/setup-local-art.mjs; see PROVENANCE.md.'
+
+// ------------------------------------------------------------------ source ---
 
 const candidates = [
   value('from'),
@@ -79,66 +56,246 @@ const candidates = [
   path.join(os.homedir(), 'clawd-on-desk'),
 ].filter(Boolean)
 
-const source = candidates.map((entry) => path.resolve(entry)).find((entry) => fs.existsSync(path.join(entry, 'assets', 'svg')))
-if (!source) {
+const checkout = candidates.map((entry) => path.resolve(entry)).find((entry) => fs.existsSync(path.join(entry, 'themes')))
+if (!checkout) {
   process.stderr.write(
-    `no clawd-on-desk checkout found (looked for assets/svg in):\n  ${candidates.join('\n  ')}\n` +
+    `no clawd-on-desk checkout found (looked for a themes/ directory in):\n  ${candidates.join('\n  ')}\n` +
       `pass one explicitly: node scripts/setup-local-art.mjs --from /path/to/clawd-on-desk\n`,
   )
   process.exit(1)
 }
 
-const assetDir = path.join(source, 'assets', 'svg')
-const available = new Set(fs.readdirSync(assetDir))
-const referenced = new Set()
-const collect = (entry) => {
-  if (Array.isArray(entry)) entry.forEach(collect)
-  else if (entry && typeof entry === 'object') collect(entry.file ?? entry.files)
-  else if (typeof entry === 'string') referenced.add(entry)
-}
-for (const state of Object.values(MAPPING.states)) collect(state)
-MAPPING.idleAnimations.forEach(collect)
-MAPPING.workingTiers.forEach(collect)
-Object.values(MAPPING.reactions).forEach(collect)
+const only = (value('only') ?? '')
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean)
 
-const missing = [...referenced].filter((file) => !available.has(file))
-if (missing.length) {
-  process.stderr.write(`the checkout at ${source} is missing ${missing.length} referenced file(s):\n  ${missing.join('\n  ')}\n`)
+/** Every theme directory upstream ships, minus the scaffold. */
+function upstreamThemes() {
+  const root = path.join(checkout, 'themes')
+  const found = []
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const dir = path.join(root, entry.name)
+    const manifestPath = path.join(dir, 'theme.json')
+    if (!fs.existsSync(manifestPath)) continue
+    let manifest
+    try {
+      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    } catch (error) {
+      process.stderr.write(`skipping ${entry.name}: theme.json is not valid JSON (${error.message})\n`)
+      continue
+    }
+    // `_scaffoldOnly` marks the template: upstream skips it in its own theme
+    // list, and it is a form to fill in rather than a theme to display.
+    if (manifest._scaffoldOnly === true) continue
+    if (only.length && !only.includes(entry.name)) continue
+    // The built-in Clawd theme carries no assets/ of its own: its artwork is the
+    // checkout's shared assets/svg/ directory.
+    const ownArt = path.join(dir, 'assets')
+    const artDir = fs.existsSync(ownArt) ? ownArt : path.join(checkout, 'assets', 'svg')
+    if (!fs.existsSync(artDir)) {
+      process.stderr.write(`skipping ${entry.name}: no artwork directory (${artDir})\n`)
+      continue
+    }
+    found.push({ id: entry.name, dir, manifest, artDir })
+  }
+  return found
+}
+
+// -------------------------------------------------------------- translation ---
+
+const numeric = (value) => {
+  if (!value || typeof value !== 'object') return undefined
+  const out = Object.fromEntries(Object.entries(value).filter(([, entry]) => typeof entry === 'number' && Number.isFinite(entry)))
+  return Object.keys(out).length ? out : undefined
+}
+
+const fileEntry = (entry) => {
+  if (Array.isArray(entry)) {
+    const files = entry.filter((file) => typeof file === 'string' && file)
+    return files.length ? { files } : undefined
+  }
+  if (entry && typeof entry === 'object') {
+    const out = {}
+    const files = Array.isArray(entry.files) ? entry.files.filter((file) => typeof file === 'string' && file) : []
+    if (files.length) out.files = files
+    else if (typeof entry.file === 'string' && entry.file) out.files = [entry.file]
+    if (typeof entry.duration === 'number' && Number.isFinite(entry.duration)) out.duration = entry.duration
+    return Object.keys(out).length ? out : undefined
+  }
+  if (typeof entry === 'string' && entry) return { files: [entry] }
+  return undefined
+}
+
+/**
+ * Upstream states may be a file list or `{ files, fallbackTo }`; resolve the
+ * fallback chain here so the emitted manifest stands on its own, and drop
+ * states this plugin never displays.
+ */
+function translateStates(upstream) {
+  const resolve = (state, seen = new Set()) => {
+    if (seen.has(state)) return undefined
+    seen.add(state)
+    const entry = upstream?.[state]
+    if (!entry) return undefined
+    const files = fileEntry(entry)?.files
+    if (files?.length) return files
+    const fallbackTo = entry && typeof entry === 'object' ? entry.fallbackTo : undefined
+    return typeof fallbackTo === 'string' ? resolve(fallbackTo, seen) : undefined
+  }
+  const states = {}
+  for (const state of ALL_STATES) {
+    const files = resolve(state)
+    if (files?.length) states[state] = files
+  }
+  return states
+}
+
+function translateTiers(tiers) {
+  if (!Array.isArray(tiers)) return undefined
+  const out = tiers
+    .filter((tier) => tier && typeof tier.file === 'string' && Number.isFinite(tier.minSessions))
+    .map((tier) => ({ minSessions: tier.minSessions, file: tier.file }))
+    .sort((a, b) => b.minSessions - a.minSessions)
+  return out.length ? out : undefined
+}
+
+function translateReactions(reactions) {
+  if (!reactions || typeof reactions !== 'object') return undefined
+  const out = {}
+  for (const [kind, entry] of Object.entries(reactions)) {
+    const translated = fileEntry(entry)
+    if (translated?.files?.length) {
+      out[kind] = { file: translated.files[0], ...(translated.duration ? { duration: translated.duration } : {}) }
+    }
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
+/**
+ * Translate one upstream manifest into this plugin's schema. Only the fields
+ * this plugin reads are carried over; everything else upstream declares
+ * (eye tracking, hit boxes, mini mode, accessories, per-file offsets…) belongs
+ * to its own renderer and is deliberately dropped rather than half-honoured.
+ */
+function translateTheme(source) {
+  const upstream = source.manifest
+  const timings = {}
+  const minDisplay = numeric(upstream.timings?.minDisplay)
+  const autoReturn = numeric(upstream.timings?.autoReturn)
+  if (minDisplay) timings.minDisplay = minDisplay
+  if (autoReturn) timings.autoReturn = autoReturn
+  // Upstream sleeps after `mouseSleepTimeout` of pointer idleness; that is the
+  // same entry point as our idle -> sleep chain, so it maps across. Its
+  // per-phase durations are tuned to its own renderer, so ours keeps its pacing.
+  if (Number.isFinite(upstream.timings?.mouseSleepTimeout)) timings.idleSleepMs = upstream.timings.mouseSleepTimeout
+
+  const viewBox = numeric(upstream.viewBox)
+  const contentBox = numeric(upstream.layout?.contentBox)
+  const objectScale = numeric(upstream.objectScale)
+  const workingTiers = translateTiers(upstream.workingTiers)
+  const jugglingTiers = translateTiers(upstream.jugglingTiers)
+  const idleAnimations = Array.isArray(upstream.idleAnimations)
+    ? upstream.idleAnimations
+        .filter((entry) => entry && typeof entry.file === 'string')
+        .map((entry) => ({ file: entry.file, ...(Number.isFinite(entry.duration) ? { duration: entry.duration } : {}) }))
+    : []
+  const reactions = translateReactions(upstream.reactions)
+
+  return {
+    schemaVersion: 1,
+    id: source.id,
+    name: typeof upstream.name === 'string' && upstream.name ? upstream.name : source.id,
+    author: typeof upstream.author === 'string' ? upstream.author : 'clawd-on-desk contributors',
+    version: typeof upstream.version === 'string' ? upstream.version : '1.0.0',
+    license: NOTICE,
+    description: `${typeof upstream.description === 'string' && upstream.description ? `${upstream.description} ` : ''}Translated from ${path.relative(checkout, source.dir)}/theme.json for dsh-clawd.`,
+    _artwork: `copied from ${source.artDir}`,
+    _license: LICENSE_NOTE,
+    ...(viewBox ? { viewBox } : {}),
+    ...(contentBox ? { contentBox } : {}),
+    ...(objectScale
+      ? {
+          objectScale: Object.fromEntries(
+            ['widthRatio', 'heightRatio', 'offsetX', 'offsetY']
+              .filter((key) => Number.isFinite(objectScale[key]))
+              .map((key) => [key, objectScale[key]]),
+          ),
+        }
+      : {}),
+    states: translateStates(upstream.states),
+    ...(workingTiers ? { workingTiers } : {}),
+    ...(jugglingTiers ? { jugglingTiers } : {}),
+    ...(idleAnimations.length ? { idleAnimations } : {}),
+    ...(reactions ? { reactions } : {}),
+    ...(Object.keys(timings).length ? { timings } : {}),
+  }
+}
+
+// ----------------------------------------------------------------- placement ---
+
+function materialize(source, { link, force }) {
+  const target = path.join(TARGET_ROOT, source.id)
+  const art = path.join(target, 'art')
+  let copied = 0
+  let bytes = 0
+
+  if (fs.existsSync(target)) {
+    if (!force) return { target, manifest: null, skipped: true, copied, bytes }
+    fs.rmSync(target, { recursive: true, force: true })
+  }
+  fs.mkdirSync(target, { recursive: true })
+
+  const manifest = translateTheme(source)
+  if (link) {
+    fs.symlinkSync(source.artDir, art, 'dir')
+  } else {
+    fs.cpSync(source.artDir, art, { recursive: true })
+    for (const name of fs.readdirSync(art)) {
+      const stat = fs.statSync(path.join(art, name))
+      if (stat.isFile()) {
+        copied += 1
+        bytes += stat.size
+      }
+    }
+  }
+  fs.writeFileSync(path.join(target, 'theme.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+  return { target, manifest, skipped: false, copied, bytes, linked: Boolean(link) }
+}
+
+const sources = upstreamThemes()
+if (!sources.length) {
+  process.stderr.write(`no themes to materialize from ${checkout}\n`)
   process.exit(1)
 }
 
-fs.mkdirSync(TARGET, { recursive: true })
-if (flag('force')) fs.rmSync(path.join(TARGET, 'art'), { recursive: true, force: true })
-
-const link = path.join(TARGET, 'art')
-if (!fs.existsSync(link)) {
-  fs.symlinkSync(assetDir, link, 'dir')
+const results = []
+let failures = 0
+for (const source of sources) {
+  const result = materialize(source, { link: flag('link'), force: flag('force') })
+  if (result.skipped) {
+    process.stdout.write(`SKIP  ${source.id} — already materialized (use --force to replace)\n`)
+    results.push({ source, result })
+    continue
+  }
+  const checked = validateTheme(result.manifest, result.target)
+  const states = Object.keys(result.manifest.states).length
+  const art = result.linked ? `-> ${source.artDir}` : `${result.copied} files, ${(result.bytes / 1024).toFixed(0)} KiB`
+  if (checked.errors.length) {
+    failures += 1
+    process.stdout.write(`FAIL  ${source.id} — ${checked.errors.length} error(s)\n`)
+    for (const error of checked.errors) process.stdout.write(`        error: ${error}\n`)
+  } else {
+    process.stdout.write(`OK    ${source.id} (${states} states, ${art})\n`)
+  }
+  for (const warning of checked.warnings ?? []) process.stdout.write(`        warn:  ${warning}\n`)
+  results.push({ source, result })
 }
 
-const theme = {
-  schemaVersion: 1,
-  id: 'clawd',
-  name: 'Clawd (local-only artwork)',
-  author: 'clawd-on-desk artwork, linked locally',
-  version: '1.0.0',
-  license: 'All Rights Reserved — LOCAL USE ONLY, NOT REDISTRIBUTABLE',
-  description: 'Clawd, linked from a local clawd-on-desk checkout. This theme is never committed or shipped; see PROVENANCE.md.',
-  _artwork: `linked from ${assetDir}`,
-  _license: 'The artwork in this theme is All Rights Reserved and is covered by neither this repository nor its MIT license.',
-  viewBox: { x: -15, y: -25, width: 45, height: 45 },
-  // Every file in this set keeps 45x45 units of viewBox around a character that
-  // occupies about 23x20 of them (the source theme's own layout.contentBox).
-  contentBox: { x: -4, y: -3, width: 23, height: 20 },
-  objectScale: { widthRatio: 1, heightRatio: 1, offsetX: 0, offsetY: 0 },
-  states: MAPPING.states,
-  workingTiers: MAPPING.workingTiers,
-  idleAnimations: MAPPING.idleAnimations,
-  reactions: MAPPING.reactions,
-  timings: MAPPING.timings,
-}
-
-fs.writeFileSync(path.join(TARGET, 'theme.json'), `${JSON.stringify(theme, null, 2)}\n`, 'utf8')
 process.stdout.write(
-  `local theme "clawd" ready\n  artwork: ${assetDir} (symlinked as assets/local-themes/clawd/art)\n  manifest: ${path.relative(ROOT, path.join(TARGET, 'theme.json'))}\n` +
-    `  ${referenced.size} referenced files, all present\n  NOT committed: assets/local-themes/ is in .gitignore\n`,
+  `\n${results.length} theme(s) from ${checkout}\n` +
+    `  placed in ${path.relative(ROOT, TARGET_ROOT)} (git-ignored — nothing here is committed)\n` +
+    `  reload them in Settings -> Clawd -> Reload themes\n`,
 )
+process.exit(failures ? 1 : 0)

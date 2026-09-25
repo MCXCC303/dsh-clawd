@@ -162,6 +162,22 @@ test('the host half serves state, artwork, settings and a live feed', async (t) 
     assert.equal(crossSite.status, 403)
   })
 
+  await t.test('two working sessions wear the theme\'s tier-2 artwork', async () => {
+    for (const id of ['tier-a', 'tier-b']) {
+      harness.emit('session/created', session(id))
+      harness.emit('session/event', session(id), event('tool/call', { turn: 1, step: 1, callId: `c-${id}`, name: 'read' }))
+    }
+    await wait(120)
+    const payload = await (await fetch(`${base}/dsh-clawd/state.json`)).json()
+    assert.equal(payload.state, 'working')
+    assert.equal(payload.counts.working, 2)
+    // The placeholder theme asks for juggling.svg from two working sessions up.
+    assert.match(payload.asset.file, /juggling\.svg$/)
+
+    for (const id of ['tier-a', 'tier-b']) harness.emit('session/disposed', session(id))
+    await wait(120)
+  })
+
   await t.test('session events move the pet', async () => {
     harness.emit('session/created', session('s-1'))
     harness.emit('session/event', session('s-1'), event('turn/start', { turn: 1 }))
@@ -286,6 +302,89 @@ test('the host half serves state, artwork, settings and a live feed', async (t) 
     assert.equal(response.status, 404)
     assert.match((await response.json()).error, /no dsh-clawd route/)
   })
+})
+
+test('a theme whose artwork an audit measured as blank shows the idle pose', async () => {
+  // A user theme in $DSH_HOME, with an audit.json marking its `working` file as
+  // painting nothing — exactly what cloudling's broken exports get.
+  const themeDir = path.join(sandboxHome, 'dsh-clawd', 'themes', 'audited')
+  fs.mkdirSync(path.join(themeDir, 'art'), { recursive: true })
+  fs.writeFileSync(
+    path.join(themeDir, 'art', 'blank.svg'),
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><title>blank</title></svg>',
+  )
+  fs.copyFileSync('assets/themes/placeholder/art/idle.svg', path.join(themeDir, 'art', 'idle.svg'))
+  fs.writeFileSync(
+    path.join(themeDir, 'theme.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      id: 'audited',
+      name: 'Audited',
+      viewBox: { x: 0, y: 0, width: 64, height: 64 },
+      states: { idle: ['idle.svg'], working: ['blank.svg'], thinking: ['blank.svg'] },
+    }),
+  )
+  fs.writeFileSync(
+    path.join(themeDir, 'audit.json'),
+    JSON.stringify({ version: 1, theme: 'audited', threshold: 1, unrenderable: ['blank.svg'], paints: { 'blank.svg': { ink: 0 } } }),
+  )
+
+  const harness = stubContext()
+  apply(harness.ctx, { theme: 'audited' })
+  const { server, base } = await startServer(harness.routes)
+  try {
+    await fetch(`${base}/dsh-clawd/refresh`, { method: 'POST' })
+    // Select it through the guarded route, the way the settings page does: an
+    // earlier sub-test already persisted its own theme into the sandbox home.
+    await fetch(`${base}/dsh-clawd/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: 'audited' }),
+    })
+    let payload = await (await fetch(`${base}/dsh-clawd/state.json`)).json()
+    assert.equal(payload.theme.id, 'audited')
+    assert.equal(payload.asset.file, 'idle.svg', 'idle has real artwork')
+
+    harness.emit('session/created', session('audit-1'))
+    harness.emit('session/event', session('audit-1'), event('tool/call', { turn: 1, step: 1, callId: 'c1', name: 'read' }))
+    await wait(120)
+    payload = await (await fetch(`${base}/dsh-clawd/state.json`)).json()
+    assert.equal(payload.state, 'working')
+    assert.equal(payload.asset.file, 'idle.svg', 'the blank working export is substituted instead of shown empty')
+    assert.ok(
+      payload.preload.every((url) => !url.includes('blank.svg')),
+      'nothing unusable is preloaded',
+    )
+    harness.emit('session/disposed', session('audit-1'))
+  } finally {
+    server.close()
+    harness.dispose()
+  }
+})
+
+test('tier artwork is chosen by the highest threshold the count reaches', async () => {
+  const { tierFileFor, tierFilesFor } = await import('../lib/theme.js')
+  const manifest = {
+    workingTiers: [
+      { minSessions: 1, file: 'one.svg' },
+      { minSessions: 3, file: 'three.svg' },
+      { minSessions: 2, file: 'two.svg' },
+    ],
+    jugglingTiers: [{ minSessions: 2, file: 'conducting.svg' }],
+  }
+  assert.equal(tierFileFor(manifest, 'working', 1), 'one.svg')
+  assert.equal(tierFileFor(manifest, 'working', 2), 'two.svg')
+  assert.equal(tierFileFor(manifest, 'working', 9), 'three.svg')
+  assert.equal(tierFileFor(manifest, 'juggling', 1), undefined, 'below the lowest threshold the state file stands')
+  assert.equal(tierFileFor(manifest, 'juggling', 2), 'conducting.svg')
+  assert.equal(tierFileFor(manifest, 'thinking', 5), undefined, 'only busy states carry tiers')
+  assert.equal(tierFileFor({}, 'working', 3), undefined)
+  assert.deepEqual(
+    tierFilesFor(manifest, 'working', 3),
+    ['three.svg', 'two.svg', 'one.svg'],
+    'the whole reached chain is available, most specific first, for substitution',
+  )
+  assert.deepEqual(tierFilesFor(manifest, 'working', 0), [])
 })
 
 test('the default height is 64px when nothing configured it', async () => {

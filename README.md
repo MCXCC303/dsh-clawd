@@ -29,20 +29,55 @@ Or, from the Harness itself, install the bundle
 The plugin activates immediately; the pet appears in the bottom-right corner
 behind `Settings → Clawd`.
 
-## See Clawd instead of the placeholder blob
+## Bring in Clawd, Calico and Cloudling
 
 This repository ships only artwork it is allowed to redistribute (the
-`placeholder` theme, MIT). The Clawd artwork belongs to the `clawd-on-desk`
-project and is *All Rights Reserved*, so it is never committed — but if that
-project is installed on your machine, you can link its artwork locally:
+`placeholder` theme, MIT). Everything else belongs to the `clawd-on-desk`
+project and is *All Rights Reserved* — Clawd is Anthropic's character, Calico is
+© 鹿鹿 — so none of it is committed. If that project is installed on your
+machine, one command materializes **all of its bundled themes** locally, into
+the git-ignored `assets/local-themes/`:
 
 ```bash
 node scripts/setup-local-art.mjs --from /path/to/clawd-on-desk
+#   OK    calico    (15 states, 28 files, 11469 KiB)
+#   OK    clawd     (15 states, 48 files, 344 KiB)
+#   OK    cloudling (15 states, 29 files, 563 KiB)
 # then: Settings → Clawd → Reload themes
 ```
 
-That creates `assets/local-themes/clawd/` (git-ignored) with a symlink to the
-artwork and a manifest mapping states to it. See [PROVENANCE.md](PROVENANCE.md).
+Nothing is copied verbatim from upstream: each `theme.json` is **translated**
+into this plugin's manifest schema (states, tiers, idle pool, reactions,
+timings, content box), and upstream's own scaffold theme is skipped. `--link`
+symlinks the artwork instead of copying it (~12 MiB saved); `--only clawd,calico`
+selects themes; `--force` regenerates ones already materialized.
+
+### When a theme's artwork renders empty
+
+Some upstream exports paint nothing in an `<img>`: their character is assembled
+by an inline script, which the browser never runs for an `<img>` (upstream
+renders those files through a live `<object>` instead). Cloudling ships eight
+such files — `sweeping`, `carrying`, `sleeping`, `building`, the sleep
+transitions — which would show an **empty frame**.
+
+`npm run audit-local-art` renders every referenced file in headless Chromium,
+measures the painted pixels inside the theme's `contentBox`, and writes
+`audit.json` next to the theme. The plugin reads that file and substitutes the
+idle pose for a state whose only artwork paints nothing. Two caveats, both
+honest limitations rather than oversights:
+
+* A file that paints *a fragment* of the character (cloudling's `juggling` shows
+  only the paper plane, `conducting` only a baton) cannot be told apart from a
+  legitimate pose by measurement — silhouette statistics flag real poses such as
+  Calico's carrying animation too. Those two are listed under
+  `manualUnrenderable` in the audit, which every re-run preserves; edit that list
+  to curate a theme by hand.
+* Nothing here executes scripts from theme artwork. `<img>` is used throughout
+  precisely because it does not, so third-party art cannot reach into the GUI's
+  document.
+
+See [PROVENANCE.md](PROVENANCE.md) for the licensing this design exists to
+respect.
 
 ## Settings
 
@@ -127,10 +162,11 @@ manifests. Every route runs the Harness' own Host/Origin + browser-auth fence
 ## Development
 
 ```bash
-npm test                    # node:test suite over the state machine
+npm test                    # node:test suite over the state machine, host and client halves
 npm run check               # syntax-check every entry point
-npm run validate-theme
+npm run validate-theme      # validate every theme this plugin can see
 npm run setup-local-art -- --from /path/to/clawd-on-desk
+npm run audit-local-art     # measure what each theme's artwork actually paints
 ```
 
 Editing `lib/client.js` hot-reloads in the browser (the Harness' client HMR

@@ -11,5 +11,9 @@ node_modules/
 # plus its own redistributable placeholder theme, and nothing else.
 assets/local-themes/
 
+# The artwork audit is a measurement of whatever is installed on this machine
+# (renderer version, timestamp, per-file ink): regenerated, never committed.
+assets/themes/*/audit.json
+
 # --- runtime scratch ---
 .clawd-dev/
