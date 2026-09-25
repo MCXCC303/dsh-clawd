@@ -299,7 +299,9 @@ const THEME = {
     { file: 'roam.svg', duration: 7000 },
   ],
   reactions: {
-    drag: { file: 'carrying.svg', duration: 2000 },
+    // `drag` is a pose held for as long as the pointer is down, so it carries no
+    // duration; the click reactions are one-shots and do.
+    drag: { file: 'carrying.svg' },
     clickLeft: { file: 'attention.svg', duration: 2000 },
     clickRight: { file: 'error.svg', duration: 2000 },
     double: { file: 'juggling.svg', duration: 2200 },

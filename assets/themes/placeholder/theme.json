@@ -101,8 +101,7 @@
   ],
   "reactions": {
     "drag": {
-      "file": "carrying.svg",
-      "duration": 2000
+      "file": "carrying.svg"
     },
     "clickLeft": {
       "file": "attention.svg",

@@ -91,6 +91,12 @@ live beside `theme.json` or in an `art/` subdirectory, and may be SVG, PNG, GIF,
 APNG, WebP or JPEG. SVG with embedded CSS `@keyframes` plays natively in an
 `<img>`, which is what the built-in themes use.
 
+A reaction is either a one-shot or a held pose: `drag` shows for exactly as long
+as the pointer is down (the client holds it and releases it on pointerup, blur,
+or unmount), while `clickLeft`, `clickRight`, `double` and `annoyed` play for
+their `duration` (default `timings.reactionMs`). Give a held kind no `duration`;
+one is ignored for it.
+
 `contentBox` is the rectangle inside `viewBox` that the character actually
 occupies. The settings "size" is the height of *that* rectangle, so artwork with
 generous transparent margins — the Clawd set draws a 23×20 cat inside a 45×45
