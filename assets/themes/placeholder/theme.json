@@ -99,6 +99,15 @@
       "duration": 7000
     }
   ],
+  "toolPoses": {
+    "job_output": {
+      "short": "reading.svg",
+      "long": "sleeping.svg"
+    },
+    "job_list": {
+      "short": "reading.svg"
+    }
+  },
   "reactions": {
     "drag": {
       "file": "carrying.svg"

@@ -174,6 +174,39 @@ function translateReactions(reactions) {
 }
 
 /**
+ * Tool poses, derived from the artwork that is actually there rather than from a
+ * table of names: an upstream theme that ships a `*reading*` file gets the
+ * reading pose for a short `job_output` poll, and whatever it uses for
+ * `sleeping` becomes the pose for a long one. A theme with neither gets no
+ * `toolPoses` and simply keeps its generic busy artwork.
+ *
+ * @param {string} artDir - the materialized artwork directory.
+ * @param {Record<string, string[]>} states - the translated states.
+ * @param {string[]} blocked - files an earlier audit measured as blank.
+ */
+function translateToolPoses(artDir, states, blocked = []) {
+  const files = fs.readdirSync(artDir).filter((name) => /[.](svg|png|apng|gif|webp|jpe?g)$/i.test(name))
+  const usable = (file) => file && !blocked.includes(file)
+  const reading =
+    files.find((name) => /(^|[-_.])reading([-_.]|$)/i.test(name) && usable(name)) ??
+    files.find((name) => /(^|[-_.])(book|newspaper|paper)([-_.]|$)/i.test(name) && usable(name))
+  // A long wait *holds* one frame, so a theme's static poster for sleeping beats
+  // its animated export — cloudling ships exactly that (`lowPowerStaticImageOverrides`).
+  const sleeping =
+    files.find((name) => /(^|[-_.])sleeping-static([-_.]|$)/i.test(name) && usable(name)) ??
+    (states.sleeping ?? []).find(usable) ??
+    files.find((name) => /(^|[-_.])sleeping([-_.]|$)/i.test(name) && usable(name))
+
+  const jobOutput = {}
+  if (reading) jobOutput.short = reading
+  if (sleeping) jobOutput.long = sleeping
+  const poses = {}
+  if (Object.keys(jobOutput).length) poses.job_output = jobOutput
+  if (reading) poses.job_list = { short: reading }
+  return Object.keys(poses).length ? poses : undefined
+}
+
+/**
  * Translate one upstream manifest into this plugin's schema. Only the fields
  * this plugin reads are carried over; everything else upstream declares
  * (eye tracking, hit boxes, mini mode, accessories, per-file offsets…) belongs
@@ -202,6 +235,8 @@ function translateTheme(source) {
         .map((entry) => ({ file: entry.file, ...(Number.isFinite(entry.duration) ? { duration: entry.duration } : {}) }))
     : []
   const reactions = translateReactions(upstream.reactions)
+  const states = translateStates(upstream.states)
+  const toolPoses = translateToolPoses(source.artDir, states, translateTheme.blocked ?? [])
 
   return {
     schemaVersion: 1,
@@ -224,7 +259,8 @@ function translateTheme(source) {
           ),
         }
       : {}),
-    states: translateStates(upstream.states),
+    states,
+    ...(toolPoses ? { toolPoses } : {}),
     ...(workingTiers ? { workingTiers } : {}),
     ...(jugglingTiers ? { jugglingTiers } : {}),
     ...(idleAnimations.length ? { idleAnimations } : {}),
@@ -235,18 +271,31 @@ function translateTheme(source) {
 
 // ----------------------------------------------------------------- placement ---
 
+/** Files an existing audit.json measured as painting nothing, if there is one. */
+function readBlockedFiles(id) {
+  try {
+    const audit = JSON.parse(fs.readFileSync(path.join(TARGET_ROOT, id, 'audit.json'), 'utf8'))
+    return [...(audit.unrenderable ?? []), ...(audit.manualUnrenderable ?? [])]
+  } catch {
+    return []
+  }
+}
+
 function materialize(source, { link, force }) {
   const target = path.join(TARGET_ROOT, source.id)
   const art = path.join(target, 'art')
   let copied = 0
   let bytes = 0
 
+  // A previous audit knows which exports paint nothing; read it before the
+  // directory that holds it is replaced, so a pose is never dressed with a blank.
+  translateTheme.blocked = readBlockedFiles(source.id)
+
   if (fs.existsSync(target)) {
     if (!force) return { target, manifest: null, skipped: true, copied, bytes }
     fs.rmSync(target, { recursive: true, force: true })
   }
   fs.mkdirSync(target, { recursive: true })
-
   const manifest = translateTheme(source)
   if (link) {
     fs.symlinkSync(source.artDir, art, 'dir')

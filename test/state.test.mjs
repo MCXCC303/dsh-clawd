@@ -178,6 +178,33 @@ test('a session that leaves the store stops counting', () => {
   assert.equal(b.machine.snapshot().state, 'idle')
 })
 
+test('a blocking tool call reports how long it blocks for', () => {
+  const b = bench()
+  b.machine.sessionCreated(session('s1'))
+  const call = (name, args) => b.machine.sessionEvent(session('s1'), event('tool/call', { turn: 1, step: 1, callId: 'c1', name, arguments: args }))
+
+  call('job_output', JSON.stringify({ job_id: 'j1' }))
+  assert.deepEqual(b.machine.snapshot().tool, { name: 'job_output', waitMs: 0 }, 'a plain call does not block')
+
+  call('job_output', JSON.stringify({ job_id: 'j1', wait: true, timeout_ms: 5000 }))
+  assert.equal(b.machine.snapshot().tool.waitMs, 5000)
+
+  call('job_output', JSON.stringify({ wait: true, timeout_ms: 600000 }))
+  assert.equal(b.machine.snapshot().tool.waitMs, 600000)
+
+  call('job_output', JSON.stringify({ wait: true }))
+  assert.equal(b.machine.snapshot().tool.waitMs, 30000, 'blocking without a timeout counts as the longest wait')
+
+  call('job_output', 'not json')
+  assert.equal(b.machine.snapshot().tool.waitMs, 0, 'unparseable arguments never throw')
+
+  call('bash', JSON.stringify({ wait: true, timeout_ms: 600000 }))
+  assert.deepEqual(b.machine.snapshot().tool, { name: 'bash', waitMs: 600000 }, 'any tool may block; the theme decides what that looks like')
+
+  b.machine.sessionEvent(session('s1'), event('tool/result', { message: { toolCallId: 'c1' } }))
+  assert.equal(b.machine.snapshot().tool, null, 'nothing is in flight any more')
+})
+
 test('a held reaction lasts until it is released, then the state returns', () => {
   const b = bench()
   b.machine.sessionCreated(session('s1'))

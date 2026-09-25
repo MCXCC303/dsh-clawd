@@ -362,6 +362,91 @@ test('a theme whose artwork an audit measured as blank shows the idle pose', asy
   }
 })
 
+test('a tool pose outranks the busy artwork, and its boundary is the theme\'s', async () => {
+  const { poseFileFor } = await import('../lib/theme.js')
+  const manifest = {
+    toolPoses: { job_output: { short: 'reading.svg', long: 'sleeping.svg' }, job_list: 'reading.svg' },
+  }
+  const timings = { longWaitMs: 30000 }
+  assert.equal(poseFileFor(manifest, { name: 'job_output', waitMs: 0 }, timings), 'reading.svg')
+  assert.equal(poseFileFor(manifest, { name: 'job_output', waitMs: 29999 }, timings), 'reading.svg')
+  assert.equal(poseFileFor(manifest, { name: 'job_output', waitMs: 30000 }, timings), 'sleeping.svg', 'the boundary is inclusive')
+  assert.equal(poseFileFor(manifest, { name: 'job_output', waitMs: 900000 }, timings), 'sleeping.svg')
+  assert.equal(poseFileFor(manifest, { name: 'job_list', waitMs: 0 }, timings), 'reading.svg', 'a plain string pose ignores the wait')
+  assert.equal(poseFileFor(manifest, { name: 'job_list', waitMs: 900000 }, timings), 'reading.svg')
+  assert.equal(poseFileFor(manifest, { name: 'bash', waitMs: 0 }, timings), undefined, 'an unmapped tool keeps the state artwork')
+  assert.equal(poseFileFor({}, { name: 'job_output', waitMs: 0 }, timings), undefined)
+  assert.equal(poseFileFor(manifest, null, timings), undefined)
+  assert.equal(
+    poseFileFor({ toolPoses: { job_output: { long: 'sleeping.svg' } } }, { name: 'job_output', waitMs: 0 }, timings),
+    undefined,
+    'a theme that declares only `long` keeps its busy artwork for a quick read',
+  )
+  assert.equal(
+    poseFileFor({ toolPoses: { job_output: { long: 'sleeping.svg' } } }, { name: 'job_output', waitMs: 600000 }, timings),
+    'sleeping.svg',
+  )
+
+  // …and the host prefers it over the tier artwork a busy state would otherwise wear.
+  const themeDir = path.join(sandboxHome, 'dsh-clawd', 'themes', 'posed')
+  fs.mkdirSync(path.join(themeDir, 'art'), { recursive: true })
+  for (const file of ['working.svg', 'reading.svg', 'sleeping.svg']) {
+    fs.copyFileSync('assets/themes/placeholder/art/idle.svg', path.join(themeDir, 'art', file))
+  }
+  fs.writeFileSync(
+    path.join(themeDir, 'theme.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      id: 'posed',
+      name: 'Posed',
+      viewBox: { x: 0, y: 0, width: 64, height: 64 },
+      states: { idle: ['idle.svg'], working: ['working.svg'], thinking: ['working.svg'] },
+      toolPoses: { job_output: { short: 'reading.svg', long: 'sleeping.svg' } },
+      timings: { longWaitMs: 60000 },
+    }),
+  )
+  fs.copyFileSync('assets/themes/placeholder/art/idle.svg', path.join(themeDir, 'art', 'idle.svg'))
+
+  const harness = stubContext()
+  apply(harness.ctx, {})
+  const { server, base } = await startServer(harness.routes)
+  try {
+    await fetch(`${base}/dsh-clawd/refresh`, { method: 'POST' })
+    await fetch(`${base}/dsh-clawd/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: 'posed' }),
+    })
+    const call = (arguments_) =>
+      harness.emit('session/event', session('posed-1'), event('tool/call', { turn: 1, step: 1, callId: 'c1', name: 'job_output', arguments: arguments_ }))
+    harness.emit('session/created', session('posed-1'))
+
+    call(JSON.stringify({ job_id: 'j', wait: true, timeout_ms: 10000 }))
+    await wait(120)
+    let payload = await (await fetch(`${base}/dsh-clawd/state.json`)).json()
+    assert.equal(payload.state, 'working')
+    assert.equal(payload.asset.file, 'reading.svg', 'a short poll reads')
+
+    call(JSON.stringify({ job_id: 'j', wait: true, timeout_ms: 600000 }))
+    await wait(120)
+    payload = await (await fetch(`${base}/dsh-clawd/state.json`)).json()
+    assert.equal(payload.asset.file, 'sleeping.svg', 'a long poll sleeps')
+
+    call(JSON.stringify({ job_id: 'j' }))
+    await wait(120)
+    payload = await (await fetch(`${base}/dsh-clawd/state.json`)).json()
+    assert.equal(payload.asset.file, 'reading.svg')
+
+    // The pose artwork is part of the theme's served table, not a broken link.
+    const art = await fetch(`${base}/dsh-clawd/art/posed/reading.svg`)
+    assert.equal(art.status, 200)
+    harness.emit('session/disposed', session('posed-1'))
+  } finally {
+    server.close()
+    harness.dispose()
+  }
+})
+
 test('tier artwork is chosen by the highest threshold the count reaches', async () => {
   const { tierFileFor, tierFilesFor } = await import('../lib/theme.js')
   const manifest = {
@@ -385,6 +470,30 @@ test('tier artwork is chosen by the highest threshold the count reaches', async 
     'the whole reached chain is available, most specific first, for substitution',
   )
   assert.deepEqual(tierFilesFor(manifest, 'working', 0), [])
+})
+
+test('tool poses are validated like any other artwork reference', async () => {
+  const { validateTheme } = await import('../lib/theme.js')
+  const themeDir = path.join(sandboxHome, 'theme-contract')
+  fs.mkdirSync(themeDir, { recursive: true })
+  fs.writeFileSync(path.join(themeDir, 'one.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"/>')
+  const base = {
+    schemaVersion: 1,
+    id: 't',
+    name: 'T',
+    viewBox: { x: 0, y: 0, width: 64, height: 64 },
+    states: { idle: ['one.svg'], working: ['one.svg'], thinking: ['one.svg'] },
+  }
+  const check = (extra) => validateTheme({ ...base, ...extra }, themeDir)
+
+  assert.deepEqual(check({ toolPoses: { job_output: { short: 'one.svg', long: 'one.svg' } } }).errors, [])
+  assert.deepEqual(check({ toolPoses: { job_list: 'one.svg' } }).errors, [])
+  assert.match(check({ toolPoses: { job_output: { short: 'missing.svg' } } }).errors.join(), /does not exist/)
+  assert.match(check({ toolPoses: { job_output: { sideways: 'one.svg' } } }).errors.join(), /may only declare/)
+  assert.match(check({ toolPoses: { job_output: 7 } }).errors.join(), /must be a file name/)
+  assert.match(check({ toolPoses: [] }).errors.join(), /must be an object/)
+  assert.match(check({ timings: { longWaitMs: -1 } }).errors.join(), /longWaitMs/)
+  assert.match(check({ timings: { longWaitMs: 'soon' } }).errors.join(), /longWaitMs/)
 })
 
 test('the default height is 64px when nothing configured it', async () => {

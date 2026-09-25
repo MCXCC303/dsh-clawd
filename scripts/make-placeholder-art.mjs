@@ -172,6 +172,22 @@ const ART = {
       </g>`,
     }),
   ),
+  reading: wrap(
+    'Placeholder pet, reading',
+    `.blob{animation:read 3.4s ease-in-out infinite}
+     .book{transform-box:fill-box;transform-origin:50% 100%;animation:page 3.4s ease-in-out infinite}
+     @keyframes read{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-1px) rotate(1deg)}}
+     @keyframes page{0%,100%{transform:rotate(-1.5deg)}50%{transform:rotate(1.5deg)}}`,
+    blob({
+      face: 'half',
+      mouthKind: 'flat',
+      extra: `<g class="book">
+        <path d="M18 44 h13 l1 5 -13 -0.5z" fill="#f4f5f8"/>
+        <path d="M46 44 h-13 l-1 5 13 -0.5z" fill="#e6e8ef"/>
+        <path d="M31 44 v5" stroke="#b9bdc9" stroke-width="1"/>
+      </g>`,
+    }),
+  ),
   sweeping: wrap(
     'Placeholder pet, compacting',
     `.blob{animation:sweep 1.8s ease-in-out infinite}
@@ -298,6 +314,12 @@ const THEME = {
     { file: 'dozing.svg', duration: 6000 },
     { file: 'roam.svg', duration: 7000 },
   ],
+  // Tool poses: a short `job_output` poll reads like reading, a long one parks the
+  // agent, which reads like sleeping. `timings.longWaitMs` is the boundary.
+  toolPoses: {
+    job_output: { short: 'reading.svg', long: 'sleeping.svg' },
+    job_list: { short: 'reading.svg' },
+  },
   reactions: {
     // `drag` is a pose held for as long as the pointer is down, so it carries no
     // duration; the click reactions are one-shots and do.

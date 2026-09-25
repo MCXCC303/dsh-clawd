@@ -95,26 +95,17 @@ if (state.settings.size !== 64) fail(`default size is ${state.settings.size}, ex
 if (!state.asset?.url) fail('no artwork resolved for the idle state')
 
 const manifest = JSON.parse(fs.readFileSync(path.join(pkgRoot, 'assets', 'themes', 'placeholder', 'theme.json'), 'utf8'))
-const referenced = new Set()
-const collect = (entry) => {
-  if (Array.isArray(entry)) entry.forEach((file) => referenced.add(file))
-  else if (entry && typeof entry === 'object') {
-    if (entry.file) referenced.add(entry.file)
-    for (const file of entry.files ?? []) referenced.add(file)
-    if (typeof entry === 'string') referenced.add(entry)
-  } else if (typeof entry === 'string') referenced.add(entry)
-}
-Object.values(manifest.states).forEach(collect)
-;(manifest.idleAnimations ?? []).forEach(collect)
-Object.values(manifest.reactions ?? {}).forEach(collect)
-for (const tier of [...(manifest.workingTiers ?? []), ...(manifest.jugglingTiers ?? [])]) collect(tier.file)
+// One walker, the plugin's own: a second copy here would drift the moment the
+// manifest grows a field (it already did, for `toolPoses`).
+const { themeFiles } = await import('../lib/theme.js')
+const referenced = themeFiles(manifest)
 let served = 0
 for (const file of referenced) {
   const response = await fetch(`${base}/dsh-clawd/art/placeholder/${encodeURIComponent(file)}`)
   if (response.status !== 200) fail(`artwork ${file} answered ${response.status}`)
   else served += 1
 }
-note(`artwork : ${served}/${referenced.size} referenced files served from the tarball`)
+note(`artwork : ${served}/${referenced.length} referenced files served from the tarball`)
 
 const traversal = await fetch(`${base}/dsh-clawd/art/placeholder/%2e%2e%2f%2e%2e%2fpackage.json`)
 if (traversal.status !== 404) fail(`a traversal attempt answered ${traversal.status}, expected 404`)

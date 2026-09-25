@@ -129,6 +129,26 @@ live beside `theme.json` or in an `art/` subdirectory, and may be SVG, PNG, GIF,
 APNG, WebP or JPEG. SVG with embedded CSS `@keyframes` plays natively in an
 `<img>`, which is what the built-in themes use.
 
+`toolPoses` dresses specific tool calls. It exists because some calls look like
+something in particular: `job_output` either reads a little output or parks the
+agent on a long poll, and the two read very differently. A theme maps a tool to
+one file, or to `{ short, long }` and lets the call's own `timeout_ms` decide —
+`timings.longWaitMs` (default 30000) is the boundary, and `wait: true` without a
+timeout counts as the longest wait. A tool a theme does not list keeps the busy
+state's artwork, so `toolPoses` is purely additive:
+
+```jsonc
+"toolPoses": {
+  "job_output": { "short": "clawd-idle-reading.svg", "long": "clawd-sleeping.svg" },
+  "job_list":   { "short": "clawd-idle-reading.svg" }
+}
+```
+
+The bundled themes derive this from their own artwork rather than from a table of
+names: a theme with a `*reading*` file reads for a short poll, and its static
+sleeping poster (or its `sleeping` state) is the long one. Calico has no reading
+art, so it only sleeps.
+
 A reaction is either a one-shot or a held pose: `drag` shows for exactly as long
 as the pointer is down (the client holds it and releases it on pointerup, blur,
 or unmount), while `clickLeft`, `clickRight`, `double` and `annoyed` play for
