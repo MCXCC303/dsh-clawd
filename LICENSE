@@ -22,13 +22,13 @@ SOFTWARE.
 
 ---
 
-This license covers the source code and the original artwork of this
-repository only. It does NOT cover:
+This license covers the source code and the original artwork of this repository
+only. It does NOT cover:
 
-  * the Clawd character, which is Anthropic's (this project is an unofficial,
-    non-commercial fan work);
-  * any artwork under `assets/local-themes/`, which is materialized locally
-    from a separate, restrictively licensed installation and is never
-    distributed by this repository.
+  * the Clawd character, which is Anthropic's — this project is an unofficial,
+    non-commercial fan work that claims no rights in it;
+  * any artwork under `assets/local-themes/`, which is materialized on the
+    user's own machine from a separate, restrictively licensed installation
+    (All Rights Reserved) and is never distributed by this repository.
 
-See PROVENANCE.md for the per-item inventory.
+README.md, section "Licensing and provenance", carries the per-item inventory.

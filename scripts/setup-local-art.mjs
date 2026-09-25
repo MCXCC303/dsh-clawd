@@ -5,7 +5,7 @@
  *
  * Why this exists: that project's artwork is `All Rights Reserved` — explicitly
  * outside its source license, and the Clawd character itself is Anthropic's
- * (see PROVENANCE.md). None of it may be redistributed, so this repository ships
+ * (see docs/PROVENANCE.md). None of it may be redistributed, so this repository ships
  * only its own MIT placeholder theme and pulls the rest in locally, on demand,
  * from an installation the user already has.
  *
@@ -44,7 +44,7 @@ const value = (name) => {
 
 const NOTICE = 'All Rights Reserved — LOCAL USE ONLY, NOT REDISTRIBUTABLE'
 const LICENSE_NOTE =
-  'The artwork in this theme is neither this repository’s nor covered by its MIT license. It was materialized locally by scripts/setup-local-art.mjs; see PROVENANCE.md.'
+  'The artwork in this theme is neither this repository’s nor covered by its MIT license. It was materialized locally by scripts/setup-local-art.mjs; see docs/PROVENANCE.md.'
 
 // ------------------------------------------------------------------ source ---
 

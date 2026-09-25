@@ -3,9 +3,16 @@ node_modules/
 *.log
 .DS_Store
 
+# --- local-only documents -----------------------------------------------------
+# Development notes: the specification this plugin was built against, the
+# provenance/licensing long form, and the research reports behind them. They are
+# working material, not part of the product, so they live here on disk only.
+# README.md and LICENSE carry the parts a user or a release actually needs.
+docs/
+
 # --- local-only artwork (NEVER committed) -------------------------------------
 # Everything under assets/local-themes/ is artwork whose license forbids
-# redistribution (see PROVENANCE.md, section 1). It is materialized locally by
+# redistribution (see docs/PROVENANCE.md, section 1). It is materialized locally by
 # `npm run setup-local-art`, which links the artwork of an installed
 # clawd-on-desk checkout. Cloning this repository therefore yields the plugin
 # plus its own redistributable placeholder theme, and nothing else.

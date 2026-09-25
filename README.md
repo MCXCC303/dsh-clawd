@@ -79,8 +79,8 @@ honest limitations rather than oversights:
   precisely because it does not, so third-party art cannot reach into the GUI's
   document.
 
-See [PROVENANCE.md](PROVENANCE.md) for the licensing this design exists to
-respect.
+See [Licensing and provenance](#licensing-and-provenance) for why the plugin is
+built this way.
 
 ## Settings
 
@@ -229,12 +229,35 @@ tarball or a checkout.
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
-## License
+## Licensing and provenance
 
-MIT for the code and for the artwork this repository ships — see
-[LICENSE](LICENSE). Clawd is Anthropic's character; this is an unofficial,
-non-commercial fan work, and no restricted artwork is distributed here. See
-[PROVENANCE.md](PROVENANCE.md) for the item-by-item inventory.
+| Part | License | Redistributed by this repository |
+|---|---|---|
+| `lib/`, `scripts/`, `test/`, `cordis.patch.yml`, this README | MIT (`LICENSE`) | yes |
+| `assets/themes/placeholder/`, `assets/branding/icon.svg` | MIT, drawn by `scripts/make-placeholder-art.mjs` | yes |
+| `assets/local-themes/` | **All Rights Reserved** | **no** — git-ignored, never packaged |
+| artwork a user drops into `$DSH_HOME/dsh-clawd/themes/` | the user's own | no |
 
-`docs/SPEC.md` is the development specification this implementation follows,
-including the two research reports it is based on.
+The local themes are materialized by `scripts/setup-local-art.mjs` from an
+installed `clawd-on-desk` checkout, whose `assets/LICENSE` states *All Rights
+Reserved* — explicitly outside that project's source license, permitting only
+personal use of the app it ships with. Its artwork is therefore copied (or
+symlinked) into a git-ignored directory on the user's own machine, and
+`package.json` `files` never lists it. **Clawd is Anthropic's character**: this
+is an unofficial, non-commercial fan work that claims no rights in it and
+distributes none of it.
+
+Two boundaries worth stating:
+
+* The artwork audit (`npm run audit-local-art`) only *measures* those files. It
+  executes nothing from them, and the plugin renders every theme through `<img>`
+  — never `<object>` — so no theme file's script can reach into the GUI.
+* The state vocabulary, priority order and theme field names follow the
+  `clawd-on-desk` protocol (AGPL-3.0-only source). Protocols, data formats and
+  interface names are not copyrightable expression and no source file from that
+  project was copied: `lib/` is an independent implementation of the format.
+
+The long-form documents this plugin was developed against — the specification,
+the item-by-item provenance inventory, the two research reports — are working
+material and live in `docs/` on the author's machine only; `docs/` is
+git-ignored and is not part of any release.
