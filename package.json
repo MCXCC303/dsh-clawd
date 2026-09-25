@@ -1,0 +1,63 @@
+{
+  "name": "dsh-clawd",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Clawd the pixel pet, living in the DeepSeek Harness Web GUI: reacts to session and agent state, draggable, themable.",
+  "icon": "./assets/branding/icon.svg",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "lib",
+    "assets/themes",
+    "assets/branding",
+    "locale",
+    "scripts",
+    "cordis.patch.yml",
+    "README.md",
+    "PROVENANCE.md"
+  ],
+  "scripts": {
+    "test": "node --test test/",
+    "validate-theme": "node scripts/validate-theme.mjs",
+    "create-theme": "node scripts/create-theme.mjs",
+    "setup-local-art": "node scripts/setup-local-art.mjs",
+    "make-placeholder-art": "node scripts/make-placeholder-art.mjs",
+    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/state.js && node --check lib/machine.js && node --check lib/theme.js"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.1.7-rc.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "pet",
+    "clawd",
+    "desktop-pet"
+  ]
+}

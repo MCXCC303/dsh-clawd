@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "id": "placeholder",
+  "name": "Placeholder Blob",
+  "author": "dsh-clawd contributors",
+  "version": "1.0.0",
+  "license": "MIT",
+  "description": "Original stand-in artwork drawn by scripts/make-placeholder-art.mjs so a fresh clone renders something. Replace it with your own theme.",
+  "viewBox": {
+    "x": 0,
+    "y": 0,
+    "width": 64,
+    "height": 64
+  },
+  "contentBox": {
+    "x": 8,
+    "y": 2,
+    "width": 48,
+    "height": 56
+  },
+  "objectScale": {
+    "widthRatio": 1,
+    "heightRatio": 1,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "states": {
+    "idle": [
+      "idle.svg"
+    ],
+    "thinking": [
+      "thinking.svg"
+    ],
+    "working": [
+      "working.svg"
+    ],
+    "attention": [
+      "attention.svg"
+    ],
+    "error": [
+      "error.svg"
+    ],
+    "notification": [
+      "notification.svg"
+    ],
+    "sweeping": [
+      "sweeping.svg"
+    ],
+    "juggling": [
+      "juggling.svg"
+    ],
+    "carrying": [
+      "carrying.svg"
+    ],
+    "sleeping": [
+      "sleeping.svg"
+    ],
+    "yawning": [
+      "yawning.svg"
+    ],
+    "dozing": [
+      "dozing.svg"
+    ],
+    "collapsing": [
+      "collapsing.svg"
+    ],
+    "waking": [
+      "waking.svg"
+    ],
+    "roam": [
+      "roam.svg"
+    ]
+  },
+  "workingTiers": [
+    {
+      "minSessions": 3,
+      "file": "working.svg"
+    },
+    {
+      "minSessions": 2,
+      "file": "juggling.svg"
+    },
+    {
+      "minSessions": 1,
+      "file": "working.svg"
+    }
+  ],
+  "idleAnimations": [
+    {
+      "file": "idle.svg",
+      "duration": 8000
+    },
+    {
+      "file": "dozing.svg",
+      "duration": 6000
+    },
+    {
+      "file": "roam.svg",
+      "duration": 7000
+    }
+  ],
+  "reactions": {
+    "drag": {
+      "file": "carrying.svg",
+      "duration": 2000
+    },
+    "clickLeft": {
+      "file": "attention.svg",
+      "duration": 2000
+    },
+    "clickRight": {
+      "file": "error.svg",
+      "duration": 2000
+    },
+    "double": {
+      "file": "juggling.svg",
+      "duration": 2200
+    },
+    "annoyed": {
+      "file": "sweeping.svg",
+      "duration": 2200
+    }
+  },
+  "timings": {
+    "minDisplay": {
+      "attention": 4000,
+      "error": 5000,
+      "notification": 2500,
+      "sweeping": 4000,
+      "carrying": 3000
+    },
+    "idleSleepMs": 180000,
+    "sleepStepMs": 30000
+  }
+}

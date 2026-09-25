@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="128" height="128" role="img" aria-label="dsh-clawd">
+  <title>dsh-clawd</title>
+  <rect x="6" y="6" width="52" height="52" rx="14" fill="#8b6cf0"/>
+  <rect x="6" y="30" width="52" height="28" rx="14" fill="#6d4fd6" opacity=".35"/>
+  <circle cx="24" cy="30" r="4" fill="#fff"/><circle cx="40" cy="30" r="4" fill="#fff"/>
+  <circle cx="24" cy="31" r="2" fill="#241a3d"/><circle cx="40" cy="31" r="2" fill="#241a3d"/>
+  <path d="M27 42 q5 4 10 0" stroke="#241a3d" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+  <line x1="32" y1="6" x2="32" y2="0" stroke="#241a3d" stroke-width="0" />
+</svg>
+

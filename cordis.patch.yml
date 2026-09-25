@@ -1,0 +1,20 @@
+# dsh-clawd bundle patch: one host row over the web profile.
+#
+# The row id is the plugin's identity everywhere in the Harness:
+#   * the settings namespace,
+#   * the `/plugins/<id>/client.js` served client bundle,
+#   * the `plugin_manager` entry id.
+# The name resolves from the profile's node_modules, where
+#   dsh plugin --profile web add link:/abs/path/dsh-clawd
+# installed this package.
+#
+# Every key below is a default for the plugin's own settings store; a value the
+# user changes in Settings -> Clawd wins over the value written here.
+- insert:
+    - id: dsh-clawd
+      name: dsh-clawd
+      config:
+        enabled: true
+        theme: clawd
+        size: 132
+        sounds: false
