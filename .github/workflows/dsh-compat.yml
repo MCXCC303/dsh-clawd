@@ -63,38 +63,63 @@ jobs:
           set -euo pipefail
           profile="$DSH_HOME/profiles/ci"
           policy="$profile/pnpm-workspace.yaml"
+          helper="$RUNNER_TEMP/allow-builds.cjs"
 
-          # pnpm 11 refuses to finish while a dependency's build script is
-          # undecided, and the Harness records that decision in the profile's
-          # pnpm-workspace.yaml as `allowBuilds: { <pkg>: set this to true or false }`
-          # (the plugin manager resolves it through `approvedBuilds`). This job
-          # only boots the web server, so decline whatever pnpm leaves pending
-          # rather than leaving it undecided — and decline it up front, because a
-          # failed first attempt aborts before the bundles are recorded.
-          decline_pending_builds() {
-            node -e '
-              const fs = require("node:fs")
-              const file = process.argv[1]
-              if (!fs.existsSync(file)) process.exit(0)
-              const text = fs.readFileSync(file, "utf8")
-              const next = text.replace(/^(\s+[^:\n]+):\s*set this to true or false\s*$/gm, "$1: false")
-              if (next !== text) {
-                fs.writeFileSync(file, next)
-                console.log("declined pending builds:", [...next.matchAll(/^\s+([^:\n]+): false$/gm)].map((m) => m[1]).join(", "))
-              }
-            ' "$policy"
+          # pnpm refuses to finish while a dependency's build script is undecided
+          # (`koffi`, the native FFI dependency the web carrier pulls in), and it
+          # does *not* leave a placeholder behind to fix up afterwards — 11.28
+          # just fails the install. The Harness reads the decision from
+          # `allowBuilds` in the profile's pnpm-workspace.yaml, the same map the
+          # plugin manager writes through `approvedBuilds`. This job only boots
+          # the web server and never needs the native module, so the decision is
+          # written once the profile's policy file exists.
+          cat > "$helper" <<'JS'
+          const fs = require('node:fs')
+          const path = require('node:path')
+          const [file, ...names] = process.argv.slice(2)
+          if (names.length === 0) process.exit(0)
+          fs.mkdirSync(path.dirname(file), { recursive: true })
+          let text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
+          if (!/^allowBuilds:/m.test(text)) text += `${text !== '' && !text.endsWith('\n') ? '\n' : ''}allowBuilds:\n`
+          for (const name of names) {
+            const existing = new RegExp(`^\\s+${name}:.*$`, 'm')
+            text = existing.test(text)
+              ? text.replace(existing, `  ${name}: false`)
+              : text.replace(/^allowBuilds:\s*$/m, `allowBuilds:\n  ${name}: false`)
           }
+          fs.writeFileSync(file, text)
+          console.log(`declined build scripts: ${names.join(', ')}`)
+          JS
 
+          dsh --profile ci --help >/dev/null 2>&1 || true   # initializes the profile
+
+          # Belt and braces: if a later dependency ever needs the same decision,
+          # pnpm names it in the failure, so decline whatever it names and retry
+          # once instead of failing the job for a policy the job does not need.
           add_bundle() {
-            if ! dsh plugin --profile ci add "$1"; then
-              decline_pending_builds
-              dsh plugin --profile ci add "$1"
+            local out
+            if out="$(dsh plugin --profile ci add "$1" 2>&1)"; then
+              printf '%s\n' "$out"
+              return 0
             fi
+            printf '%s\n' "$out"
+            local names
+            names="$(printf '%s\n' "$out" | sed -n 's/.*Ignored build scripts: //p' | tr ',' '\n' | sed 's/@[^@]*$//' | tr -d ' ' | grep -v '^$' | sort -u | paste -sd' ' -)"
+            if [ -z "$names" ]; then
+              echo "::error::the profile install failed and pnpm named no undecided build script"
+              return 1
+            fi
+            node "$helper" "$policy" $names
+            dsh plugin --profile ci add "$1"
           }
 
-          dsh --profile ci --help >/dev/null 2>&1 || true
-          decline_pending_builds
+          # Our own plugin pulls in no native dependency, and installing it first
+          # is what materializes the profile's pnpm policy (packages, nodeLinker,
+          # autoInstallPeers) — so the decision above lands in a file the Harness
+          # itself wrote, exactly as it does when a user declines the build by
+          # hand.
           add_bundle "link:$GITHUB_WORKSPACE"
+          node "$helper" "$policy" koffi
           add_bundle "@deepseek-ai/dsh-web-app@${{ matrix.dsh }}"
 
       - name: The plugin composes into that Harness
