@@ -1,0 +1,83 @@
+name: CI
+
+# The plugin has no runtime dependencies and no build step, so CI is the gate
+# itself: the suites, the theme contract, and the tarball a user would install.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: node ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The Harness runs on ^22.19.0 || >=24.0.0 and a plugin never executes
+        # anywhere else, so those are the only versions worth a cell.
+        node-version: [22, 24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      # No `npm install`: the package declares no dependencies, and the tests
+      # run on node:test. A lockfile would only add noise.
+
+      - name: Run tests
+        run: npm test
+
+      - name: Syntax-check every entry point
+        run: npm run check
+
+      - name: Validate every theme in the tree
+        run: npm run validate-theme
+
+      - name: Pack the plugin and drive the packaged artifact
+        # Packs into a scratch directory, extracts it, then drives *that* copy:
+        # routes mount, a bare install falls back to a theme, every artwork file
+        # serves, the client factory registers, and a traversal attempt 404s.
+        run: npm run verify-package
+
+  package:
+    name: package contents
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Show what a release would ship
+        run: npm pack --dry-run
+
+      - name: Refuse to ship local-only artwork
+        # The artwork materialized by `setup-local-art` is All Rights Reserved
+        # and must never reach a tarball; see PROVENANCE.md.
+        run: |
+          set -euo pipefail
+          npm pack --pack-destination "$RUNNER_TEMP" >/dev/null
+          listing="$(tar tzf "$RUNNER_TEMP"/*.tgz)"
+          if grep -Eq 'local-themes|calico|cloudling|audit\.json' <<<"$listing"; then
+            echo "::error::the tarball contains files that must stay local"
+            grep -E 'local-themes|calico|cloudling|audit\.json' <<<"$listing"
+            exit 1
+          fi
+          echo "tarball carries no local-only artwork"

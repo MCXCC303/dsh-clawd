@@ -1,0 +1,111 @@
+name: DSH compatibility
+
+# Which Harness releases can carry this plugin? The declaration lives in
+# package.json (`dsh.engines.dsh`, `dsh.compatibility.dshReleases`); this
+# workflow is what keeps it honest — one cell per declared release, each one
+# installing that Harness, composing a throwaway profile with this plugin, and
+# then booting it and asking the plugin's own route for an answer.
+#
+# The route answering 401 is the pass condition, not 200: the plugin fences
+# every request with the Harness' own Host/Origin + browser-auth check, so 401
+# proves the plugin is active and serving, while 404 would mean it never mounted.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dsh-compat-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  matrix:
+    name: DSH ${{ matrix.dsh }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every release this plugin claims to support. Older releases are
+        # findings, not blockers: a red cell means the declaration must shrink,
+        # never that the cell should be deleted.
+        dsh: ['0.1.7-rc.1', '0.1.7-rc.2']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pnpm
+        # The Harness shells out to pnpm to install a profile's bundles.
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Install Harness ${{ matrix.dsh }}
+        run: npm install --global "@deepseek-ai/dsh@${{ matrix.dsh }}"
+
+      - name: Compose a throwaway profile with this plugin
+        # A fresh profile starts as `@deepseek-ai/dsh-base` alone; the plugin
+        # injects `webServer`, so the web carrier must be present at the same
+        # exact version or the entry stays pending forever. The CLI's version
+        # gate is why the version is pinned rather than left to `latest`.
+        env:
+          DSH_HOME: ${{ runner.temp }}/home
+        run: |
+          set -euo pipefail
+          dsh plugin --profile ci add "link:$GITHUB_WORKSPACE"
+          dsh plugin --profile ci add "@deepseek-ai/dsh-web-app@${{ matrix.dsh }}"
+
+      - name: The plugin composes into that Harness
+        env:
+          DSH_HOME: ${{ runner.temp }}/home
+        run: |
+          set -euo pipefail
+          dsh --profile ci --dump-config > composed.yml
+          grep -A3 '^- id: dsh-clawd$' composed.yml || {
+            echo "::error::the dsh-clawd row is absent from the composed profile"
+            exit 1
+          }
+          echo "composed against DSH ${{ matrix.dsh }}"
+
+      - name: Boot that Harness and ask the plugin for state
+        env:
+          DSH_HOME: ${{ runner.temp }}/home
+        run: |
+          set -euo pipefail
+          dsh --profile ci web --no-open --port 3599 > boot.log 2>&1 &
+          echo "$!" > boot.pid
+
+          for _ in $(seq 1 60); do
+            if curl -s -o /dev/null "http://127.0.0.1:3599/api/health" 2>/dev/null; then break; fi
+            if grep -qiE 'listening|http://127\.0\.0\.1' boot.log; then break; fi
+            sleep 1
+          done
+          tail -20 boot.log || true
+
+          code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3599/dsh-clawd/state.json || true)"
+          kill "$(cat boot.pid)" 2>/dev/null || true
+          echo "GET /dsh-clawd/state.json -> ${code}"
+          case "$code" in
+            401|403) echo "the plugin is mounted and fenced on DSH ${{ matrix.dsh }}" ;;
+            200) echo "::warning::the route answered 200 where the fence usually answers 401; check the Host/Origin fence" ;;
+            *) echo "::error::the plugin route answered ${code}: it is not serving on DSH ${{ matrix.dsh }}"; exit 1 ;;
+          esac
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-${{ matrix.dsh }}-diagnostics
+          path: |
+            boot.log
+            composed.yml
+          if-no-files-found: ignore

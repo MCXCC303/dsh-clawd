@@ -1,5 +1,8 @@
 # dsh-clawd
 
+[![CI](https://github.com/MCXCC303/dsh-clawd/actions/workflows/ci.yml/badge.svg)](https://github.com/MCXCC303/dsh-clawd/actions/workflows/ci.yml)
+[![DSH compatibility](https://github.com/MCXCC303/dsh-clawd/actions/workflows/dsh-compat.yml/badge.svg)](https://github.com/MCXCC303/dsh-clawd/actions/workflows/dsh-compat.yml)
+
 A pixel pet for the **DeepSeek Harness Web GUI**. It sits in the corner, follows
 what the Harness is doing — thinking, running tools, waiting for your approval,
 finishing a turn, failing, compacting, juggling subagents — falls asleep when
@@ -172,6 +175,39 @@ npm run audit-local-art     # measure what each theme's artwork actually paints
 Editing `lib/client.js` hot-reloads in the browser (the Harness' client HMR
 watches the served bundle). Editing the host half needs a plugin reload or a
 Harness restart.
+
+## Supported Harness versions
+
+| Declared in | Field | Meaning |
+|---|---|---|
+| `package.json` | `dsh.engines.dsh` = `>=0.1.7-rc.1` | advisory range, read by tooling and marketplaces |
+| `package.json` | `dsh.compatibility.dshReleases` | per-release verdict; `compatible` means CI boots it |
+| `.github/workflows/dsh-compat.yml` | the matrix itself | one cell per release the plugin claims |
+
+`0.1.7-rc.1` and `0.1.7-rc.2` are the declared releases; everything older is
+`unknown`, not "unsupported" — the APIs this plugin calls have existed since
+`0.1.2-rc.1`, but only the declared cells are verified by CI, and a claim CI does
+not check is a guess.
+
+Note what *enforces* a version and what merely documents it. The Harness' install
+gate evaluates **`peerDependencies`** named `@deepseek-ai/dsh*` against the
+running version (prereleases included) and refuses a mismatch with
+`incompatible-version` unless an exact-version exemption is granted. This package
+declares **no** such peer on purpose: the plugin imports nothing from the Harness
+at runtime — it speaks to it through Cordis services and events — so a hard gate
+would block installs for no measured reason. `dsh.engines` and
+`dsh.compatibility` are the declaration; the compatibility workflow is the proof.
+
+## Releasing
+
+Tag `v<version>` matching `package.json` and the release workflow runs the same
+gate as CI, packs `dsh-clawd-<version>.tgz`, writes `SHA256SUMS.txt`, and attaches
+both to the GitHub Release. There is no npm publish: a bundle is consumed as a
+tarball or a checkout.
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
 
 ## License
 

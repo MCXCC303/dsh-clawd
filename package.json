@@ -35,11 +35,25 @@
     "setup-local-art": "node scripts/setup-local-art.mjs",
     "audit-local-art": "node scripts/audit-local-art.mjs",
     "make-placeholder-art": "node scripts/make-placeholder-art.mjs",
-    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/state.js && node --check lib/machine.js && node --check lib/theme.js"
+    "check": "node --check lib/index.js && node --check lib/client.js && node --check lib/state.js && node --check lib/machine.js && node --check lib/theme.js",
+    "verify-package": "node scripts/verify-package.mjs",
+    "pack": "npm pack --pack-destination dist"
   },
   "dsh": {
     "engines": {
       "dsh": ">=0.1.7-rc.1"
+    },
+    "compatibility": {
+      "dsh": ">=0.1.7-rc.1",
+      "dshReleases": {
+        "0.1.7-rc.1": "compatible",
+        "0.1.7-rc.2": "compatible",
+        "0.1.6-alpha.2": "unknown",
+        "0.1.5-rc.3": "unknown",
+        "0.1.2-rc.1": "unknown",
+        "0.1.0-rc.8": "unknown",
+        "0.0.1-rc.5": "unknown"
+      }
     },
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -61,5 +75,13 @@
     "pet",
     "clawd",
     "desktop-pet"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MCXCC303/dsh-clawd.git"
+  },
+  "homepage": "https://github.com/MCXCC303/dsh-clawd#readme",
+  "bugs": {
+    "url": "https://github.com/MCXCC303/dsh-clawd/issues"
+  }
 }

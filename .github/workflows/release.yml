@@ -1,0 +1,64 @@
+name: Release
+
+# A release is a tagged commit plus the tarball that tag produces. The plugin is
+# consumed as a bundle (`dsh plugin --profile <name> add <tarball>`), so the
+# GitHub Release is the distribution channel — there is no npm publish step.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Gate, pack and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate the tag against package.json
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          if [ "v${VERSION}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${VERSION}"
+            exit 1
+          fi
+          echo "tag ${GITHUB_REF_NAME} matches package.json ${VERSION}"
+
+      - name: Run tests
+        run: npm test
+
+      - name: Syntax-check every entry point
+        run: npm run check
+
+      - name: Validate every theme in the tree
+        run: npm run validate-theme
+
+      - name: Pack and drive the packaged artifact
+        run: npm run verify-package
+
+      - name: Pack the release tarball
+        run: npm pack --pack-destination dist
+
+      - name: Write checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum ./*.tgz > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publish the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tgz
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
