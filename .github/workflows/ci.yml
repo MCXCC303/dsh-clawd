@@ -68,6 +68,11 @@ jobs:
       - name: Show what a release would ship
         run: npm pack --dry-run
 
+      - name: Build the code-only variant and drive it
+        # Packs without `assets/themes`, then boots the extracted copy to prove a
+        # theme-less install still mounts and answers.
+        run: npm run pack:no-art
+
       - name: Refuse upstream code and artwork in the tracked tree
         # MIT covers only what this repository wrote. The state vocabulary and
         # the theme format are reimplemented from a published protocol; the

@@ -218,6 +218,22 @@ at runtime — it speaks to it through Cordis services and events — so a hard 
 would block installs for no measured reason. `dsh.engines` and
 `dsh.compatibility` are the declaration; the compatibility workflow is the proof.
 
+## Two builds
+
+| Command | Ships | Use it for |
+|---|---|---|
+| `npm run pack` | everything, including the MIT placeholder theme | a clone-and-run install that renders immediately |
+| `npm run pack:no-art` | the same code with `assets/themes/` removed | destinations that supply their own artwork, or must carry none |
+
+A theme-less build is not a broken build: the host half mounts, the pet stays
+hidden, and Settings → Clawd says no theme is available — add one through
+`$DSH_HOME/dsh-clawd/themes/`, `npm run create-theme`, or
+`npm run setup-local-art`. `scripts/pack-variant.mjs` takes `--without <path>`
+(repeatable), `--label`, `--version-suffix` and `--out`; drop the plugin icon too
+with `--without assets/themes --without assets/branding`. Both builds keep the
+same `name@version` unless you pass `--version-suffix`, so publishing them side
+by side to one registry wants a suffix.
+
 ## Releasing
 
 Tag `v<version>` matching `package.json` and the release workflow runs the same
