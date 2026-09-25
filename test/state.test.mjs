@@ -178,6 +178,33 @@ test('a session that leaves the store stops counting', () => {
   assert.equal(b.machine.snapshot().state, 'idle')
 })
 
+test('a held reaction lasts until it is released, then the state returns', () => {
+  const b = bench()
+  b.machine.sessionCreated(session('s1'))
+  b.machine.sessionEvent(session('s1'), event('tool/call', { callId: 'c1', name: 'read' }))
+
+  b.machine.holdReact('clawd-react-drag.svg', 'drag')
+  assert.equal(b.machine.snapshot().reaction?.file, 'clawd-react-drag.svg')
+  assert.equal(b.machine.snapshot().reaction?.held, true)
+
+  // Far longer than any theme reaction duration: a hold is a gesture, not a timer.
+  b.advance(20000)
+  assert.equal(b.machine.snapshot().reaction?.kind, 'drag', 'a hold does not expire on its own')
+
+  assert.equal(b.machine.releaseReact('drag'), true)
+  assert.equal(b.machine.snapshot().reaction, null)
+  assert.equal(b.machine.snapshot().state, 'working', 'the pet returns to what it was doing')
+  assert.equal(b.machine.releaseReact('drag'), false, 'releasing twice is a no-op')
+})
+
+test('a held reaction cannot be stranded forever, and release ignores another kind', () => {
+  const b = bench()
+  b.machine.holdReact('clawd-react-drag.svg', 'drag')
+  assert.equal(b.machine.releaseReact('clickLeft'), false, 'a different kind does not release it')
+  b.advance(31000)
+  assert.equal(b.machine.snapshot().reaction, null, 'the safety cap ends a lost pointerup')
+})
+
 test('reactions never cover an urgent state', () => {
   const b = bench()
   b.machine.sessionCreated(session('s1'))

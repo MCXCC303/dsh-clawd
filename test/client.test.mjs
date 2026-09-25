@@ -67,20 +67,30 @@ function createMiniReact() {
     },
   }
 
-  /** Render an element tree to plain nodes, running effects the way React would. */
+  /**
+   * Render an element tree to plain nodes, running effects the way React would.
+   * Effect cleanups are kept per hook slot for the life of the tree, so the
+   * returned `cleanups` are the unmount cleanups — including those of effects
+   * that ran in an earlier pass.
+   */
   function render(element) {
+    const cleanupByIndex = new Map()
     for (let pass = 0; pass < 12; pass += 1) {
       cursor = 0
       effects = []
       dirty = false
       const tree = resolve(element)
-      const cleanups = []
       for (const { index, effect, deps } of effects) {
+        const previous = cleanupByIndex.get(index)
+        if (previous) {
+          previous()
+          cleanupByIndex.delete(index)
+        }
         hooks[index] = { deps }
         const cleanup = effect()
-        if (typeof cleanup === 'function') cleanups.push(cleanup)
+        if (typeof cleanup === 'function') cleanupByIndex.set(index, cleanup)
       }
-      if (!dirty) return { tree, cleanups }
+      if (!dirty) return { tree, cleanups: [...cleanupByIndex.values()] }
     }
     throw new Error('mini React: the tree did not settle')
   }
@@ -331,9 +341,33 @@ test('dragging moves the pet and commits one position write', async () => {
   const write = h.requests.find((request) => request.url.endsWith('/settings'))
   assert.ok(write, 'the new position is persisted through the guarded route')
   assert.deepEqual(JSON.parse(write.options.body), { position: { x: 80, y: 95 } })
-  assert.ok(
-    h.requests.some((request) => request.url.endsWith('/react') && JSON.parse(request.options.body).kind === 'drag'),
-    'dragging plays the theme drag reaction once',
+  assert.deepEqual(
+    h.requests.filter((request) => request.url.endsWith('/react')).map((request) => JSON.parse(request.options.body)),
+    [
+      { kind: 'drag', phase: 'hold' },
+      { kind: 'drag', phase: 'release' },
+    ],
+    'the drag pose is held while the pointer is down and released on pointerup, never played on a timer',
+  )
+})
+
+test('a drag that loses its pointerup still releases the pose', async () => {
+  const h = await harness()
+  const { tree, cleanups } = h.render(h.Component.pet({}))
+  const stage = findAll(tree, 'div').find((node) => node.props.className?.startsWith('clawd-stage'))
+
+  stage.props.onPointerDown({ button: 0, pointerId: 1, clientX: 10, clientY: 10, currentTarget: { setPointerCapture() {} } })
+  stage.props.onPointerMove({ clientX: 60, clientY: 60 })
+  // No pointerup: the overlay unmounts mid-gesture instead.
+  cleanups.forEach((cleanup) => cleanup())
+
+  assert.deepEqual(
+    h.requests.filter((request) => request.url.endsWith('/react')).map((request) => JSON.parse(request.options.body)),
+    [
+      { kind: 'drag', phase: 'hold' },
+      { kind: 'drag', phase: 'release' },
+    ],
+    'unmounting releases the held pose',
   )
 })
 

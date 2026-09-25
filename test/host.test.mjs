@@ -234,6 +234,28 @@ test('the host half serves state, artwork, settings and a live feed', async (t) 
     assert.equal(reacted.ok, true, 'the placeholder theme declares a clickLeft reaction')
     assert.equal(reacted.payload.asset.kind, 'reaction')
 
+    // A drag pose is held: it must survive any theme duration and end on release.
+    const held = await (
+      await fetch(`${base}/dsh-clawd/react`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'drag', phase: 'hold' }),
+      })
+    ).json()
+    assert.equal(held.held, true)
+    assert.equal(held.payload.asset.kind, 'reaction')
+    assert.match(held.payload.asset.file, /carrying\.svg$/)
+
+    const released = await (
+      await fetch(`${base}/dsh-clawd/react`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'drag', phase: 'release' }),
+      })
+    ).json()
+    assert.equal(released.ok, true)
+    assert.equal(released.payload.asset.kind, 'state', 'the pet returns to its state after the drag')
+
     const broken = await fetch(`${base}/dsh-clawd/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
