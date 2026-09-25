@@ -218,21 +218,34 @@ at runtime — it speaks to it through Cordis services and events — so a hard 
 would block installs for no measured reason. `dsh.engines` and
 `dsh.compatibility` are the declaration; the compatibility workflow is the proof.
 
-## Two builds
+## Three builds
 
 | Command | Ships | Use it for |
 |---|---|---|
 | `npm run pack` | everything, including the MIT placeholder theme | a clone-and-run install that renders immediately |
 | `npm run pack:no-art` | the same code with `assets/themes/` removed | destinations that supply their own artwork, or must carry none |
+| `npm run pack:local-art` | **plus** the locally materialized Clawd/Calico/Cloudling themes | the author's own machines — **never publish this one** |
 
 A theme-less build is not a broken build: the host half mounts, the pet stays
 hidden, and Settings → Clawd says no theme is available — add one through
 `$DSH_HOME/dsh-clawd/themes/`, `npm run create-theme`, or
-`npm run setup-local-art`. `scripts/pack-variant.mjs` takes `--without <path>`
-(repeatable), `--label`, `--version-suffix` and `--out`; drop the plugin icon too
-with `--without assets/themes --without assets/branding`. Both builds keep the
-same `name@version` unless you pass `--version-suffix`, so publishing them side
-by side to one registry wants a suffix.
+`npm run setup-local-art`.
+
+The third build exists so a personal install does not have to re-run
+`setup-local-art` on every machine: it copies `assets/local-themes/` into the
+tarball (dereferencing symlinks, so nothing points back at this checkout) and
+drives the packaged `clawd` theme to prove it resolves. It carries artwork that
+is **All Rights Reserved** — the Clawd character is Anthropic's, the Calico cat
+is © 鹿鹿, and none of it is covered by this repository's MIT license — so the
+command prints a warning and writes a `LOCAL-ONLY.md` marker into the tarball
+itself, and `scripts/pack-variant.mjs` refuses to build it without `--personal`.
+The two distributable builds are the first two.
+
+`scripts/pack-variant.mjs` takes `--without <path>` and `--with <path>`
+(repeatable), `--personal`, `--label`, `--version-suffix` and `--out`; drop the
+plugin icon too with `--without assets/themes --without assets/branding`. All
+builds keep the same `name@version` unless you pass `--version-suffix`, so
+publishing two of them side by side to one registry wants a suffix.
 
 ## Releasing
 
