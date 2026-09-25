@@ -57,7 +57,7 @@ the position, reload themes. Defaults also come from the plugin's row in
       config:
         enabled: true
         theme: clawd
-        size: 132
+        size: 64
 ```
 
 User changes are stored in `$DSH_HOME/dsh-clawd/settings.json` and win over the

@@ -288,6 +288,22 @@ test('the host half serves state, artwork, settings and a live feed', async (t) 
   })
 })
 
+test('the default height is 64px when nothing configured it', async () => {
+  // The earlier sub-tests persisted settings into this sandbox home; a default
+  // only applies where no row config and no saved value exist.
+  fs.rmSync(path.join(sandboxHome, 'dsh-clawd', 'settings.json'), { force: true })
+  const harness = stubContext()
+  apply(harness.ctx, {})
+  const { server, base } = await startServer(harness.routes)
+  try {
+    const payload = await (await fetch(`${base}/dsh-clawd/state.json`)).json()
+    assert.equal(payload.settings.size, 64)
+  } finally {
+    server.close()
+    harness.dispose()
+  }
+})
+
 test('sanitizeSettings is the single gate for stored configuration', () => {
   assert.deepEqual(sanitizeSettings({ enabled: 'yes', size: 'big', theme: '  ', position: { x: 1 } }), {})
   assert.deepEqual(sanitizeSettings({ theme: 'clawd', sounds: true, position: null }), { theme: 'clawd', sounds: true, position: null })

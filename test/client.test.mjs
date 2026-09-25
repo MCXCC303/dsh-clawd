@@ -442,6 +442,12 @@ test('a theme without a contentBox falls back to the whole viewBox', async () =>
   assert.deepEqual(find(tree, 'img').props.style, { left: '0px', top: '0px', width: '132px', height: '132px' })
 })
 
+test('without a size in the payload the pet falls back to 64px', async () => {
+  const h = await harness({ payload: { ...PAYLOAD, settings: { ...PAYLOAD.settings, size: undefined } } })
+  const { tree } = h.render(h.Component.pet({}))
+  assert.equal(find(tree, 'div').props.style.height, '64px')
+})
+
 test('the pet renders before the first payload arrives', async () => {
   const h = await harness({ payload: null })
   const rendered = h.render(h.Component.pet({}))

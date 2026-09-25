@@ -16,5 +16,5 @@
       config:
         enabled: true
         theme: clawd
-        size: 132
+        size: 64
         sounds: false
