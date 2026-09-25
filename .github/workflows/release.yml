@@ -6,6 +6,10 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # A release that failed on a step the tag cannot fix has to be re-runnable:
+  # moving a published tag is worse than pressing the button again. A manual run
+  # releases `v<package.json version>` from whatever ref it is dispatched on.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -23,15 +27,21 @@ jobs:
         with:
           node-version: 24
 
-      - name: Validate the tag against package.json
+      - name: Resolve the release version
+        id: version
         run: |
           set -euo pipefail
           VERSION="$(node -p "require('./package.json').version")"
-          if [ "v${VERSION}" != "${GITHUB_REF_NAME}" ]; then
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "v${VERSION}" != "${GITHUB_REF_NAME}" ]; then
             echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${VERSION}"
             exit 1
           fi
-          echo "tag ${GITHUB_REF_NAME} matches package.json ${VERSION}"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "tag ${GITHUB_REF_NAME} matches package.json ${VERSION}"
+          else
+            echo "manual run on ${GITHUB_REF_NAME}: releasing v${VERSION}"
+          fi
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Run tests
         run: npm test
@@ -61,6 +71,9 @@ jobs:
       - name: Publish the GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          # Explicit for both triggers: on a manual run the ref is a branch, and
+          # the release still has to carry the version's tag.
+          tag_name: ${{ steps.version.outputs.tag }}
           files: |
             dist/*.tgz
             dist/SHA256SUMS.txt
