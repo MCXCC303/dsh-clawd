@@ -61,5 +61,9 @@ for (const { dir, source } of roots) {
 }
 
 const { themes } = discoverThemes(roots)
-process.stdout.write(`\n${checked} theme(s) checked, ${themes.size} usable, ${errors} with errors\n`)
+// Discovery keys themes by id with later roots winning, so the two counts differ
+// whenever a user theme shadows a local one.
+process.stdout.write(
+  `\n${checked} theme director${checked === 1 ? 'y' : 'ies'} checked, ${themes.size} usable id(s) after shadowing, ${errors} with errors\n`,
+)
 process.exit(errors ? 1 : 0)

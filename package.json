@@ -28,7 +28,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test test/*.test.mjs",
     "validate-theme": "node scripts/validate-theme.mjs",
     "create-theme": "node scripts/create-theme.mjs",
     "setup-local-art": "node scripts/setup-local-art.mjs",

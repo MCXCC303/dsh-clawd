@@ -61,8 +61,41 @@ jobs:
           DSH_HOME: ${{ runner.temp }}/home
         run: |
           set -euo pipefail
-          dsh plugin --profile ci add "link:$GITHUB_WORKSPACE"
-          dsh plugin --profile ci add "@deepseek-ai/dsh-web-app@${{ matrix.dsh }}"
+          profile="$DSH_HOME/profiles/ci"
+          policy="$profile/pnpm-workspace.yaml"
+
+          # pnpm 11 refuses to finish while a dependency's build script is
+          # undecided, and the Harness records that decision in the profile's
+          # pnpm-workspace.yaml as `allowBuilds: { <pkg>: set this to true or false }`
+          # (the plugin manager resolves it through `approvedBuilds`). This job
+          # only boots the web server, so decline whatever pnpm leaves pending
+          # rather than leaving it undecided — and decline it up front, because a
+          # failed first attempt aborts before the bundles are recorded.
+          decline_pending_builds() {
+            node -e '
+              const fs = require("node:fs")
+              const file = process.argv[1]
+              if (!fs.existsSync(file)) process.exit(0)
+              const text = fs.readFileSync(file, "utf8")
+              const next = text.replace(/^(\s+[^:\n]+):\s*set this to true or false\s*$/gm, "$1: false")
+              if (next !== text) {
+                fs.writeFileSync(file, next)
+                console.log("declined pending builds:", [...next.matchAll(/^\s+([^:\n]+): false$/gm)].map((m) => m[1]).join(", "))
+              }
+            ' "$policy"
+          }
+
+          add_bundle() {
+            if ! dsh plugin --profile ci add "$1"; then
+              decline_pending_builds
+              dsh plugin --profile ci add "$1"
+            fi
+          }
+
+          dsh --profile ci --help >/dev/null 2>&1 || true
+          decline_pending_builds
+          add_bundle "link:$GITHUB_WORKSPACE"
+          add_bundle "@deepseek-ai/dsh-web-app@${{ matrix.dsh }}"
 
       - name: The plugin composes into that Harness
         env:
@@ -81,7 +114,9 @@ jobs:
           DSH_HOME: ${{ runner.temp }}/home
         run: |
           set -euo pipefail
-          dsh --profile ci web --no-open --port 3599 > boot.log 2>&1 &
+          # `web` is the alias of `--profile web`, not a subcommand: with an
+          # explicit profile the app arguments follow the profile directly.
+          dsh --profile ci --no-open --port 3599 > boot.log 2>&1 &
           echo "$!" > boot.pid
 
           for _ in $(seq 1 60); do
