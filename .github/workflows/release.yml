@@ -46,7 +46,10 @@ jobs:
         run: npm run verify-package
 
       - name: Pack the release tarball
-        run: npm pack --pack-destination dist
+        # `npm run pack` creates dist/ first: it is git-ignored, so a fresh
+        # checkout does not have it and `npm pack --pack-destination` will not
+        # make it.
+        run: npm run pack
 
       - name: Write checksums
         run: |
