@@ -25,5 +25,11 @@ assets/themes/*/audit.json
 # --- build output ---
 dist/
 
+# CI scratch: the compatibility job writes these while it drives a throwaway
+# profile, and uploads them as failure diagnostics.
+boot.log
+boot.pid
+composed.yml
+
 # --- runtime scratch ---
 .clawd-dev/
