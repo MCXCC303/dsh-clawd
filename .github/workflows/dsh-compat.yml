@@ -27,6 +27,9 @@ jobs:
   matrix:
     name: DSH ${{ matrix.dsh }}
     runs-on: ubuntu-latest
+    # Installing a Harness plus booting it is minutes of work; a hang must end
+    # the cell quickly and visibly.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:

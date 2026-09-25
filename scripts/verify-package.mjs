@@ -60,12 +60,14 @@ process.env.DSH_HOME = home
 const { apply } = await import(path.join(pkgRoot, 'lib', 'index.js'))
 
 const routes = []
+const disposers = []
 const ctx = {
   logger: { debug() {}, info() {}, warn: (message) => note(`warn  : ${message}`) },
   get: () => undefined,
   on: () => () => {},
   effect: (callback) => {
-    callback()
+    const disposer = callback()
+    if (typeof disposer === 'function') disposers.push(disposer)
     return () => {}
   },
   webServer: {
@@ -137,10 +139,21 @@ const plugin = registration?.factory((name) => {
 if (!plugin?.inject?.includes('slots')) fail('the client plugin does not inject slots')
 note(`client  : factory "${registration?.id}" injects ${JSON.stringify(plugin?.inject)}`)
 
+// Unload the plugin exactly as a host would before shutting down; the explicit
+// exit is only the backstop, because a build step that never returns is a hang
+// in CI rather than a failure.
 server.close()
+for (const dispose of disposers.reverse()) {
+  try {
+    dispose()
+  } catch (error) {
+    fail(`the plugin did not unload cleanly: ${error?.message ?? error}`)
+  }
+}
 fs.rmSync(scratch, { recursive: true, force: true })
 if (problems.length) {
   process.stdout.write(`\n${problems.length} problem(s)\n`)
   process.exit(1)
 }
 process.stdout.write('\nthe packaged plugin is self-contained\n')
+process.exit(0)

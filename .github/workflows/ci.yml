@@ -20,6 +20,8 @@ jobs:
   test:
     name: node ${{ matrix.node-version }}
     runs-on: ubuntu-latest
+    # A plugin verifier that waits on a timer must fail fast, not hold the job.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -56,6 +58,7 @@ jobs:
   package:
     name: package and licensing hygiene
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
