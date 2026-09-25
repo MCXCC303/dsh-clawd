@@ -69,7 +69,12 @@ async function startServer(routes) {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
     for (const route of routes) {
-      const matches = route.kind === 'prefix' ? url.pathname.startsWith(route.path) : url.pathname === route.path
+      // Mirrors dsh-host-webserver's matchPrefix: `pathname === prefix ||
+      // pathname.startsWith(prefix + '/')`.
+      const matches =
+        route.kind === 'prefix'
+          ? url.pathname === route.path || url.pathname.startsWith(`${route.path}/`)
+          : url.pathname === route.path
       if (matches) {
         void route.handler(req, res)
         return
@@ -105,7 +110,7 @@ test('the host half serves state, artwork, settings and a live feed', async (t) 
   const harness = stubContext()
   apply(harness.ctx, { theme: 'placeholder', size: 120 })
   assert.equal(harness.routes.length, 1, 'exactly one prefix route is registered')
-  assert.equal(harness.routes[0].path, '/dsh-clawd/')
+  assert.equal(harness.routes[0].path, '/dsh-clawd', "the mount carries no trailing slash: the web server's prefix rule appends its own")
 
   const { server, base } = await startServer(harness.routes)
   t.after(() => {
