@@ -12,7 +12,7 @@ docs/
 
 # --- local-only artwork (NEVER committed) -------------------------------------
 # Everything under assets/local-themes/ is artwork whose license forbids
-# redistribution (see docs/PROVENANCE.md, section 1). It is materialized locally by
+# redistribution (see README.md, "Licensing and provenance"). It is materialized locally by
 # `npm run setup-local-art`, which links the artwork of an installed
 # clawd-on-desk checkout. Cloning this repository therefore yields the plugin
 # plus its own redistributable placeholder theme, and nothing else.
