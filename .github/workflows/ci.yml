@@ -54,7 +54,7 @@ jobs:
         run: npm run verify-package
 
   package:
-    name: package contents
+    name: package and licensing hygiene
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -67,6 +67,26 @@ jobs:
 
       - name: Show what a release would ship
         run: npm pack --dry-run
+
+      - name: Refuse upstream code and artwork in the tracked tree
+        # MIT covers only what this repository wrote. The state vocabulary and
+        # the theme format are reimplemented from a published protocol; the
+        # upstream implementation is AGPL-3.0 and its artwork is All Rights
+        # Reserved, so neither may be tracked here. See README, "Licensing and
+        # provenance".
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+          git ls-files > tracked.txt
+          grep -Eq 'local-themes|\.apng$' tracked.txt && fail 'the tracked tree contains local-only artwork'
+          stray="$(grep -E '\.(svg|png|gif|jpe?g|webp|ico)$' tracked.txt | grep -vE '^assets/(themes/placeholder/|branding/)' || true)"
+          [ -z "$stray" ] || fail "artwork outside the MIT themes: $stray"
+          # Only the code directories: the README and this file legitimately
+          # *discuss* the upstream license, a pasted source file would carry it.
+          if git ls-files -z -- lib scripts test | xargs -0 grep -lE 'GNU AFFERO|AGPL-3\.0|Copyright \(C\).*clawd-on-desk' >/dev/null 2>&1; then
+            fail 'AGPL-licensed source appears to be vendored under lib/, scripts/ or test/'
+          fi
+          echo 'the tracked tree carries only this repository own code and MIT artwork'
 
       - name: Refuse to ship local-only artwork
         # The artwork materialized by `setup-local-art` is All Rights Reserved
