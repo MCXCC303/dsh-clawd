@@ -20,6 +20,7 @@
   "files": [
     "lib",
     "assets/themes",
+    "!assets/themes/*/audit.json",
     "assets/branding",
     "locale",
     "scripts",

@@ -15,5 +15,8 @@ assets/local-themes/
 # (renderer version, timestamp, per-file ink): regenerated, never committed.
 assets/themes/*/audit.json
 
+# --- build output ---
+dist/
+
 # --- runtime scratch ---
 .clawd-dev/
