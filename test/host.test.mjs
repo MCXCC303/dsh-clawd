@@ -237,6 +237,23 @@ test('the host half serves state, artwork, settings and a live feed', async (t) 
     assert.equal(broken.status, 400)
   })
 
+  await t.test('themes.json lists what was discovered, and refresh re-reads the roots', async () => {
+    const listed = await (await fetch(`${base}/dsh-clawd/themes.json`)).json()
+    assert.equal(listed.active, 'placeholder', 'the configured theme wins over the built-in default order')
+    assert.ok(listed.themes.some((theme) => theme.id === 'placeholder'))
+    // Local-only artwork may or may not be linked on this machine.
+    assert.ok(listed.themes.every((theme) => ['builtin', 'local', 'user'].includes(theme.source)))
+    assert.deepEqual(listed.diagnostics, [])
+
+    const refreshed = await fetch(`${base}/dsh-clawd/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    })
+    assert.equal(refreshed.status, 200)
+    assert.deepEqual((await refreshed.json()).theme, 'placeholder')
+  })
+
   await t.test('unknown routes answer 404 with an explanation', async () => {
     const response = await fetch(`${base}/dsh-clawd/nope`)
     assert.equal(response.status, 404)
