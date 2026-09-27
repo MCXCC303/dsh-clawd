@@ -1,7 +1,7 @@
 <h1 align="center">dsh-clawd</h1>
 
 <div align="center">
-  <img height="200" alt="dsh-clawd" src="assets/branding/icon.svg" />
+  <img width="1116" height="263" alt="screenshot_20260928_004438" src="https://github.com/user-attachments/assets/5416ce24-7ba5-49bd-a010-1717cc981548" />
 </div>
 
 ---
