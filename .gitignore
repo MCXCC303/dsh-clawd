@@ -22,6 +22,12 @@ assets/local-themes/
 # (renderer version, timestamp, per-file ink): regenerated, never committed.
 assets/themes/*/audit.json
 
+# --- npm auth indirection (machine-local) ---
+# Holds one line, `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`, so a
+# granular publish token never has to appear in a command line, a shell history
+# or npm's debug logs. See README, "Publishing to npm".
+.npmrc
+
 # --- build output ---
 dist/
 

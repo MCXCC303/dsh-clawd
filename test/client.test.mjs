@@ -272,7 +272,7 @@ async function harness({ locale = 'zh', localeAvailable = true, payload = PAYLOA
 
 test('the client module registers the pet overlay and the settings page', async () => {
   const h = await harness()
-  assert.equal(h.registration.id, 'dsh-clawd', 'the factory id is the package name')
+  assert.equal(h.registration.id, '@mcxcc303/dsh-clawd', 'the factory id is the package name')
   assert.equal(h.plugin.inject.includes('slots'), true)
   assert.deepEqual([...h.slots.keys()].sort(), ['settings.section#clawd', 'shell.overlay#clawd-pet'])
   assert.equal(h.slots.get('shell.overlay#clawd-pet').options.order, 40)

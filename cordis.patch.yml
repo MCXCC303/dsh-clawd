@@ -11,8 +11,12 @@
 # Every key below is a default for the plugin's own settings store; a value the
 # user changes in Settings -> Clawd wins over the value written here.
 - insert:
+    # The id is this plugin's identity inside the Harness (settings namespace,
+    # /plugins/<id>/), so it stays `dsh-clawd` across a rename of the package.
+    # The name is the module to resolve, and a scalar starting with @ must be
+    # quoted or the YAML is invalid.
     - id: dsh-clawd
-      name: dsh-clawd
+      name: '@mcxcc303/dsh-clawd'
       config:
         enabled: true
         theme: clawd

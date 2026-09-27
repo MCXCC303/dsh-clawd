@@ -1,10 +1,13 @@
 {
-  "name": "dsh-clawd",
+  "name": "@mcxcc303/dsh-clawd",
   "version": "0.1.0",
   "type": "module",
   "description": "Clawd the pixel pet, living in the DeepSeek Harness Web GUI: reacts to session and agent state, draggable, themable.",
   "icon": "./assets/branding/icon.svg",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
