@@ -4,6 +4,13 @@
   <img width="1116" height="263" alt="screenshot_20260928_004438" src="https://github.com/user-attachments/assets/5416ce24-7ba5-49bd-a010-1717cc981548" />
 </div>
 
+<div align="center">
+
+[![CI](https://img.shields.io/github/actions/workflow/status/MCXCC303/dsh-clawd/ci.yml?branch=main&label=CI&logo=github&style=flat-square)](https://github.com/MCXCC303/dsh-clawd/actions/workflows/ci.yml)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek_Harness-v0.1.7-4D6BFE?style=flat-square&logo=deepseek&logoColor=ffffff)](https://www.deepseek.com)
+
+</div>
+
 ---
 
 一只住在 **DSH Web GUI** 角落里的 Clawd。
