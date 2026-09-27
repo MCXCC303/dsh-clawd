@@ -1,6 +1,6 @@
 {
   "name": "@mcxcc303/dsh-clawd",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Clawd the pixel pet, living in the DeepSeek Harness Web GUI: reacts to session and agent state, draggable, themable.",
   "icon": "./assets/branding/icon.svg",
