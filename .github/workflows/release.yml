@@ -28,6 +28,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+          # Writes `.npmrc` with `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`.
+          # Without this, NODE_AUTH_TOKEN alone is ignored by npm and the publish
+          # silently runs unauthenticated — the same trap a developer hits when a
+          # user-level .npmrc already hard-codes a token under that key.
+          registry-url: https://registry.npmjs.org
 
       - name: Resolve the release version
         id: version
