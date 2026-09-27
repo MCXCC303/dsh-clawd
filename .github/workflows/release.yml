@@ -2,7 +2,8 @@ name: Release
 
 # A release is a tagged commit plus the tarball that tag produces. The plugin is
 # consumed as a bundle (`dsh plugin --profile <name> add <tarball>`), so the
-# GitHub Release is the distribution channel — there is no npm publish step.
+# GitHub Release is the primary distribution channel; the npm publish below is
+# opt-in on NPM_TOKEN and skipped on a tag that does not have it.
 on:
   push:
     tags: ['v*']
@@ -76,15 +77,24 @@ jobs:
           cat SHA256SUMS.txt
 
       - name: Publish to npm
-        # Opt-in: a tag must not fail an otherwise good release just because npm
-        # auth is not set up yet. The secret is a *granular* access token with
-        # "Bypass 2FA" enabled and read/write on this package, because the
-        # account's auth-and-writes mode makes a one-time code mandatory
-        # otherwise. `--provenance` needs the id-token permission above.
-        if: ${{ secrets.NPM_TOKEN != '' }}
+        # Opt-in, and the gate is a shell test rather than `if: secrets...`: GitHub
+        # does not expose the `secrets` context to a step-level `if`, and rejects
+        # the whole workflow file when it is named there.
+        #
+        # The secret is a *granular* access token with "Bypass 2FA" enabled and
+        # read/write on this package, because the account's auth-and-writes mode
+        # makes a one-time code mandatory otherwise. `--provenance` needs the
+        # id-token permission above.
         env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public
+        run: |
+          set -euo pipefail
+          if [ -z "${NPM_TOKEN:-}" ]; then
+            echo "::warning::repository secret NPM_TOKEN is not set — skipping the npm publish; the GitHub Release is published anyway"
+            exit 0
+          fi
+          npm publish --provenance --access public
 
       - name: Publish the GitHub Release
         uses: softprops/action-gh-release@v2

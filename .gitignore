@@ -12,7 +12,7 @@ docs/
 
 # --- local-only artwork (NEVER committed) -------------------------------------
 # Everything under assets/local-themes/ is artwork whose license forbids
-# redistribution (see README.md, "Licensing and provenance"). It is materialized locally by
+# redistribution (see README.md, "LICENSE"). It is materialized locally by
 # `npm run setup-local-art`, which links the artwork of an installed
 # clawd-on-desk checkout. Cloning this repository therefore yields the plugin
 # plus its own redistributable placeholder theme, and nothing else.
@@ -25,7 +25,8 @@ assets/themes/*/audit.json
 # --- npm auth indirection (machine-local) ---
 # Holds one line, `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`, so a
 # granular publish token never has to appear in a command line, a shell history
-# or npm's debug logs. See README, "Publishing to npm".
+# or npm's debug logs. Created on demand, never committed: CI gets the same
+# indirection from actions/setup-node's `registry-url`.
 .npmrc
 
 # --- build output ---
